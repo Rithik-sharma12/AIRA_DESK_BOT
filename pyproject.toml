@@ -1,0 +1,12 @@
+[project]
+name = "aira"
+version = "0.1.0"
+description = "AIRA - Autonomous Intelligent Responsive Assistant (desktop AI companion)"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: needs a real Ollama with the configured model (set AIRA_LIVE_TESTS=1)",
+]
+filterwarnings = ["ignore::DeprecationWarning"]

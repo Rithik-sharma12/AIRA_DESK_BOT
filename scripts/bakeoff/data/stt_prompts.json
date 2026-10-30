@@ -1,0 +1,16 @@
+{
+  "description": "Phase 2 STT test set: read each line aloud, naturally, through the microphone AIRA will use. The text is the reference transcript (Tamil words in Tamil script, English words in Latin script). The 40 TTS sentences are reused, plus 10 typical commands.",
+  "include_tts_sentences": true,
+  "prompts": [
+    {"id": "cmd01", "category": "english", "text": "Hey AIRA, what's happening with my laptop?"},
+    {"id": "cmd02", "category": "english", "text": "Hey AIRA, open Visual Studio Code."},
+    {"id": "cmd03", "category": "english", "text": "Remind me to study Java at seven PM."},
+    {"id": "cmd04", "category": "english", "text": "AIRA, explain this Python error."},
+    {"id": "cmd05", "category": "tamil", "text": "AIRA, இன்னைக்கு என்ன செய்யலாம்?"},
+    {"id": "cmd06", "category": "tamil", "text": "AIRA, ஒரு பாட்டு போடு."},
+    {"id": "cmd07", "category": "tamil", "text": "AIRA, இப்போ மணி என்ன?"},
+    {"id": "cmd08", "category": "tanglish", "text": "என்ன AIRA, இன்னைக்கு என்ன plan?"},
+    {"id": "cmd09", "category": "tanglish", "text": "AIRA, network security check பண்ணு."},
+    {"id": "cmd10", "category": "tanglish", "text": "AIRA, இந்த Python error-ஐ explain பண்ணு."}
+  ]
+}

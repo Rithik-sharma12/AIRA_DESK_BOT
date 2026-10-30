@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+logs/
+benchmarks/*.json
+.pytest_cache/
+*.onnx
+models/
+bakeoff_runs/
+bakeoff_recordings/

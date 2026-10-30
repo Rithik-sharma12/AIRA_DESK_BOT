@@ -1,0 +1,34 @@
+{
+  "description": "TTS configurations compared in the Phase 2 bake-off. Edit freely; run_tts.py skips engines whose dependencies or keys are missing and says why.",
+  "engines": [
+    {
+      "id": "azure-pallavi-ta_only",
+      "provider": "azure",
+      "voice": {"strategy": "ta_only", "rate": 1.15, "pitch_pct": 8}
+    },
+    {
+      "id": "azure-pallavi-neerja-split",
+      "provider": "azure",
+      "en_style": "cheerful",
+      "voice": {"strategy": "split", "rate": 1.15, "pitch_pct": 8}
+    },
+    {
+      "id": "azure-auto-cheerful",
+      "provider": "azure",
+      "en_style": "cheerful",
+      "voice": {"strategy": "auto", "rate": 1.15, "pitch_pct": 8}
+    },
+    {
+      "id": "piper-rasa-female",
+      "provider": "piper",
+      "model_path": "models/piper/ta_IN-rasa_female-medium.onnx",
+      "voice": {"rate": 1.15}
+    },
+    {
+      "id": "indic-parler-kavya",
+      "provider": "parler",
+      "device": "cuda",
+      "voice": {"extra": {"description": "Kavya speaks in a cheerful, expressive and youthful voice at a slightly fast pace. The recording is very clear, with no background noise."}}
+    }
+  ]
+}
