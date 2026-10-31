@@ -52,6 +52,20 @@ Forget a conversation. `{"session_id": "...", "deleted": true}`
 Rolling window of recent requests: TTFT p50/p95 and tokens/s over *warm* requests,
 max load time, error counts by code.
 
+## Web voice interface (prototype)
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /` | public | the web page |
+| `POST /api/v1/web/hello` | public | prints the pairing code in the server console; returns `{"locked": bool}` |
+| `POST /api/v1/web/pair` `{"code","name"}` | public | returns `{"token"}` for this browser; 403 on a wrong code or when locked |
+| `GET /api/v1/voice/capabilities` | key or web token | `{"stt": "faster-whisper"|null, "tts": "azure"|"piper"|null, ...}` |
+| `POST /api/v1/voice/transcribe` (multipart `audio`, `language`=auto/en/ta) | key or web token | `{"text","language","audio_s","latency_s"}`; 501 if no server STT |
+| `POST /api/v1/voice/speak` `{"text"}` | key or web token | `audio/wav`; 501 if no server TTS |
+
+Web tokens are sent like the API key (`Authorization: Bearer <token>`) and work on all
+authenticated endpoints. See HOW-TO-RUN.md.
+
 ## Error format
 
 ```json

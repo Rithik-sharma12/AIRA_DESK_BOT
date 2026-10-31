@@ -9,3 +9,5 @@ benchmarks/*.json
 models/
 bakeoff_runs/
 bakeoff_recordings/
+data/
+certs/

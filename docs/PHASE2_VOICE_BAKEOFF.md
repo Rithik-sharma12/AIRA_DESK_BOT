@@ -57,12 +57,12 @@ Three voicing strategies are compared for Azure:
 
 ```powershell
 python scripts\bakeoff\record_stt.py --list-devices
-python scripts\bakeoff\record_stt.py --device "speakerphone"      # name substring or index
+python scripts\bakeoff\record_stt.py --device "Microphone"        # name substring or index
 python scripts\bakeoff\run_stt.py --with-llm                       # Gemma loaded, as in real use
 python scripts\bakeoff\run_stt.py --with-llm --prompt              # same, with a vocabulary prompt
 ```
 
-Record in the room and with the microphone AIRA will use, speaking normally. The 50
+AIRA's real microphone is the INMP441 on the Pi, which is not wired yet. Record now with the laptop's microphone at about the distance you will sit from AIRA, speaking normally; once the INMP441 works (HARDWARE.md §6.3), record a second set on the Pi and re-run `run_stt.py` on it, because a MEMS mic in a small case sounds different. The 50
 prompts are the 40 TTS sentences plus 10 typical commands. Recordings stay in
 `bakeoff_recordings\` (git-ignored).
 

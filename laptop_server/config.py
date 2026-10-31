@@ -74,6 +74,24 @@ class Settings(BaseSettings):
     tts_ta_voice: str = "ta-IN-PallaviNeural"
     tts_en_voice: str = "en-IN-NeerjaNeural"
 
+    # ---- Web voice interface (prototype) ----------------------------------------
+    web_ui_enabled: bool = True
+    data_dir: Path = Field(Path("data"), description="Runtime data (paired web devices). Git-ignored.")
+    ssl_certfile: Path | None = Field(None, description="HTTPS certificate (scripts/make_dev_cert.py)")
+    ssl_keyfile: Path | None = None
+    stt_provider: Literal["auto", "faster-whisper", "none"] = Field(
+        "auto", description="auto = faster-whisper if installed, else the browser does speech recognition")
+    stt_model: str = "large-v3-turbo"
+    stt_device: str = Field("auto", description="auto, cuda or cpu")
+    stt_compute_type: str = Field("default", description="e.g. float16, int8_float16, int8")
+    tts_provider: Literal["auto", "azure", "piper", "none"] = Field(
+        "auto", description="auto = Azure if a key is set, else Piper if a model is set, else the browser speaks")
+    tts_piper_model: Path | None = None
+    tts_rate: float = Field(1.1, ge=0.5, le=2.0)
+    tts_pitch_pct: float = Field(5.0, ge=-50, le=50)
+    tts_strategy: Literal["ta_only", "split", "auto"] = "auto"
+    max_audio_upload_mb: float = Field(10.0, gt=0, le=50)
+
     # ---- Metrics --------------------------------------------------------------
     metrics_window: int = Field(200, ge=10, le=10000)
 

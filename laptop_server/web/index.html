@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<title>AIRA</title>
+<style>
+  :root { --bg:#0b0f17; --panel:#121826; --panel2:#1a2233; --line:#263046; --ink:#e7edf7; --muted:#8a96ab;
+          --acc:#38bdf8; --acc2:#a78bfa; --ok:#34d399; --warn:#fbbf24; --bad:#f87171; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+              font:15px/1.45 system-ui,-apple-system,"Segoe UI","Noto Sans Tamil",sans-serif; }
+  body { display:flex; flex-direction:column; max-width:760px; margin:0 auto;
+         padding:10px 12px calc(12px + env(safe-area-inset-bottom)); }
+  header { display:flex; align-items:center; gap:10px; }
+  header h1 { font-size:18px; margin:0; letter-spacing:.5px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:var(--muted); }
+  .dot.ok { background:var(--ok); } .dot.warn { background:var(--warn); } .dot.bad { background:var(--bad); }
+  #status { color:var(--muted); font-size:13px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  button { font:inherit; color:var(--ink); background:var(--panel2); border:1px solid var(--line);
+           border-radius:10px; padding:8px 12px; cursor:pointer; touch-action:manipulation; }
+  button:disabled { opacity:.45; cursor:default; }
+  .icon { padding:6px 10px; }
+
+  /* face */
+  #face { position:relative; height:150px; margin:8px 0 6px; display:flex; align-items:center; justify-content:center; }
+  #face svg { width:260px; height:140px; }
+  .eye { fill:var(--acc); transform-box:fill-box; transform-origin:center; transition:transform .25s, fill .25s; }
+  .mouth { fill:var(--acc); opacity:0; transform-box:fill-box; transform-origin:center; transition:opacity .2s; }
+  #face.idle .eye { animation: blink 5s infinite; }
+  #face.listening .eye { fill:var(--ok); transform:scale(1.08,1.12); }
+  #face.thinking .eye { fill:var(--acc2); animation: look 1.4s ease-in-out infinite; }
+  #face.speaking .mouth { opacity:1; animation: talk .32s ease-in-out infinite alternate; }
+  #face.error .eye { fill:var(--bad); transform:scaleY(.35); }
+  #ring { position:absolute; width:180px; height:180px; border-radius:50%; border:2px solid var(--ok);
+          opacity:0; transform:scale(.6); transition:opacity .2s; pointer-events:none; }
+  #face.listening #ring { opacity:.55; }
+  @keyframes blink { 0%,94%,100% { transform:scaleY(1); } 96% { transform:scaleY(.1); } }
+  @keyframes look { 0%,100% { transform:translateX(-10px); } 50% { transform:translateX(10px); } }
+  @keyframes talk { from { transform:scaleY(.35); } to { transform:scaleY(1.25); } }
+
+  /* conversation */
+  #log { flex:1; overflow-y:auto; padding:6px 2px; display:flex; flex-direction:column; gap:8px; min-height:120px; }
+  .msg { max-width:86%; padding:9px 12px; border-radius:14px; white-space:pre-wrap; word-wrap:break-word; }
+  .msg.user { align-self:flex-end; background:#1e3a5f; border-bottom-right-radius:4px; }
+  .msg.aira { align-self:flex-start; background:var(--panel); border:1px solid var(--line); border-bottom-left-radius:4px; }
+  .msg.note { align-self:center; color:var(--muted); font-size:12.5px; background:none; padding:2px 8px; text-align:center; }
+  .msg.interim { opacity:.6; font-style:italic; }
+  .meta { display:block; color:var(--muted); font-size:11.5px; margin-top:4px; }
+
+  /* controls */
+  #controls { display:flex; align-items:center; gap:10px; margin-top:8px; }
+  #mic { width:68px; height:68px; border-radius:50%; flex:none; font-size:26px; padding:0;
+         background:linear-gradient(145deg,#0ea5e9,#6366f1); border:none; box-shadow:0 4px 18px #0ea5e955; }
+  #mic.rec { background:linear-gradient(145deg,#ef4444,#f97316); box-shadow:0 0 0 6px #ef444433; }
+  #mic.busy { background:var(--panel2); box-shadow:none; }
+  #textrow { flex:1; display:flex; gap:8px; }
+  #text { flex:1; min-width:0; font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line);
+          border-radius:12px; padding:11px 12px; }
+  #meter { height:4px; background:var(--panel2); border-radius:2px; margin-top:8px; overflow:hidden; }
+  #meter div { height:100%; width:0; background:var(--ok); transition:width .05s; }
+  #hint { color:var(--muted); font-size:12px; margin-top:6px; text-align:center; min-height:16px; }
+
+  /* sheets */
+  .sheet { position:fixed; inset:0; background:#000a; display:none; align-items:flex-end; justify-content:center; z-index:5; }
+  .sheet.open { display:flex; }
+  .card { width:100%; max-width:520px; background:var(--panel); border:1px solid var(--line); border-radius:16px 16px 0 0;
+          padding:16px; padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+  .card h2 { margin:0 0 10px; font-size:16px; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:10px 0; }
+  .row label { color:var(--muted); }
+  select, .card input { font:inherit; color:var(--ink); background:var(--panel2); border:1px solid var(--line);
+                        border-radius:8px; padding:7px; }
+  #code { width:100%; font-size:30px; letter-spacing:10px; text-align:center; margin:8px 0; }
+  #pairMsg { color:var(--muted); font-size:13px; min-height:18px; }
+  .primary { background:var(--acc); color:#04121c; border-color:var(--acc); font-weight:600; width:100%; padding:11px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot"></span>
+  <h1>AIRA</h1>
+  <span id="status">starting…</span>
+  <button class="icon" id="newBtn" title="New conversation">↺</button>
+  <button class="icon" id="setBtn" title="Settings">⚙</button>
+</header>
+
+<div id="face" class="idle">
+  <div id="ring"></div>
+  <svg viewBox="0 0 260 140" aria-hidden="true">
+    <rect class="eye" x="58" y="30" width="46" height="62" rx="20"/>
+    <rect class="eye" x="156" y="30" width="46" height="62" rx="20"/>
+    <rect class="mouth" x="110" y="108" width="40" height="10" rx="5"/>
+  </svg>
+</div>
+
+<div id="log" aria-live="polite"></div>
+
+<div id="meter"><div></div></div>
+<div id="controls">
+  <button id="mic" title="Talk (space)">🎤</button>
+  <div id="textrow">
+    <input id="text" placeholder="Or type to AIRA…" autocomplete="off" enterkeyhint="send">
+    <button id="send">➤</button>
+  </div>
+</div>
+<div id="hint"></div>
+
+<div class="sheet" id="pairSheet">
+  <div class="card">
+    <h2>Pair this browser with AIRA</h2>
+    <div style="color:var(--muted)">Enter the 6-digit code shown in the AIRA server window on the laptop.</div>
+    <input id="code" inputmode="numeric" maxlength="7" placeholder="000000" autocomplete="one-time-code">
+    <input id="devname" placeholder="Name for this device (e.g. Redmi)" maxlength="40" style="width:100%">
+    <div id="pairMsg"></div>
+    <button class="primary" id="pairBtn" style="margin-top:10px">Pair</button>
+  </div>
+</div>
+
+<div class="sheet" id="setSheet">
+  <div class="card">
+    <h2>Settings</h2>
+    <div class="row"><label for="sttSel">Speech recognition</label>
+      <select id="sttSel"><option value="auto">Auto</option><option value="server">Server (Whisper)</option><option value="browser">Browser</option></select></div>
+    <div class="row"><label for="ttsSel">AIRA's voice</label>
+      <select id="ttsSel"><option value="auto">Auto</option><option value="server">Server (Azure/Piper)</option><option value="browser">Browser</option><option value="off">Off (text only)</option></select></div>
+    <div class="row"><label for="langSel">I'll speak</label>
+      <select id="langSel"><option value="auto">Auto (English + Tamil)</option><option value="en">English</option><option value="ta">Tamil / Tanglish</option></select></div>
+    <div class="row"><label for="autoStop">Stop recording when I pause</label><input type="checkbox" id="autoStop" checked></div>
+    <div class="row"><label for="convo">Keep listening after AIRA replies</label><input type="checkbox" id="convo"></div>
+    <div class="row"><label for="rate">Browser voice speed</label><input type="range" id="rate" min="0.8" max="1.6" step="0.05" value="1.1"></div>
+    <div class="row" style="color:var(--muted);font-size:12.5px" id="capsInfo"></div>
+    <div class="row"><button id="forgetBtn">Forget this device</button><button id="closeSet">Done</button></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const TOKEN = "aira-web-token", PREFS = "aira-web-prefs";
+  const state = { token: localStorage.getItem(TOKEN), caps: { stt: null, tts: null }, session: null,
+                  busy: false, recording: false, abort: null, speakQueue: Promise.resolve(), speakGen: 0, audio: null };
+  const prefs = Object.assign({ stt: "auto", tts: "auto", lang: "auto", autoStop: true, convo: false, rate: 1.1 },
+                              JSON.parse(localStorage.getItem(PREFS) || "{}"));
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  // ------------------------------------------------------------------ ui helpers
+  function status(text, cls) { $("status").textContent = text; $("dot").className = "dot " + (cls || ""); }
+  function face(s) { $("face").className = s; }
+  function hint(t) { $("hint").textContent = t || ""; }
+  function bubble(cls, text) {
+    const d = document.createElement("div"); d.className = "msg " + cls; d.textContent = text;
+    $("log").appendChild(d); $("log").scrollTop = $("log").scrollHeight; return d;
+  }
+  function meta(el, text) { const m = document.createElement("span"); m.className = "meta"; m.textContent = text; el.appendChild(m); }
+  function note(text) { bubble("note", text); }
+  function savePrefs() { localStorage.setItem(PREFS, JSON.stringify(prefs)); }
+  const hasTamil = s => /[஀-௿]/.test(s);
+
+  async function api(path, opts = {}) {
+    opts.headers = Object.assign({}, opts.headers || {}, state.token ? { Authorization: "Bearer " + state.token } : {});
+    const r = await fetch(path, opts);
+    if (r.status === 401) { localStorage.removeItem(TOKEN); state.token = null; openPair(); throw new Error("not paired"); }
+    return r;
+  }
+
+  // ------------------------------------------------------------------ pairing
+  function openPair() {
+    $("pairSheet").classList.add("open"); status("pairing", "warn");
+    fetch("/api/v1/web/hello", { method: "POST" }).then(r => r.json()).then(j => {
+      $("pairMsg").textContent = j.locked ? "Pairing is locked after wrong codes. Restart the AIRA server."
+                                          : "The code is printed in the server window.";
+    }).catch(() => {});
+  }
+  $("pairBtn").onclick = async () => {
+    const code = $("code").value.replace(/\D/g, "");
+    if (code.length !== 6) { $("pairMsg").textContent = "The code has 6 digits."; return; }
+    const r = await fetch("/api/v1/web/pair", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, name: $("devname").value || navigator.platform || "browser" }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { $("pairMsg").textContent = j.detail || "Pairing failed"; return; }
+    state.token = j.token; localStorage.setItem(TOKEN, j.token);
+    $("pairSheet").classList.remove("open"); init();
+  };
+
+  // ------------------------------------------------------------------ settings
+  function applyPrefsToUI() {
+    $("sttSel").value = prefs.stt; $("ttsSel").value = prefs.tts; $("langSel").value = prefs.lang;
+    $("autoStop").checked = prefs.autoStop; $("convo").checked = prefs.convo; $("rate").value = prefs.rate;
+  }
+  ["sttSel", "ttsSel", "langSel"].forEach(id => $(id).onchange = e => { prefs[{ sttSel: "stt", ttsSel: "tts", langSel: "lang" }[id]] = e.target.value; savePrefs(); describeModes(); });
+  $("autoStop").onchange = e => { prefs.autoStop = e.target.checked; savePrefs(); };
+  $("convo").onchange = e => { prefs.convo = e.target.checked; savePrefs(); };
+  $("rate").oninput = e => { prefs.rate = +e.target.value; savePrefs(); };
+  $("setBtn").onclick = () => { applyPrefsToUI(); $("setSheet").classList.add("open"); };
+  $("closeSet").onclick = () => $("setSheet").classList.remove("open");
+  $("forgetBtn").onclick = () => { localStorage.removeItem(TOKEN); location.reload(); };
+  $("newBtn").onclick = async () => {
+    stopAll();
+    if (state.session) api("/api/v1/sessions/" + state.session, { method: "DELETE" }).catch(() => {});
+    state.session = null; $("log").innerHTML = ""; note("New conversation");
+  };
+
+  function sttMode() {
+    if (prefs.stt === "server") return state.caps.stt ? "server" : (SR ? "browser" : "none");
+    if (prefs.stt === "browser") return SR ? "browser" : (state.caps.stt ? "server" : "none");
+    return state.caps.stt ? "server" : (SR ? "browser" : "none");
+  }
+  function ttsMode() {
+    if (prefs.tts === "off") return "off";
+    if (prefs.tts === "server") return state.caps.tts ? "server" : "browser";
+    if (prefs.tts === "browser") return "browser";
+    return state.caps.tts ? "server" : ("speechSynthesis" in window ? "browser" : "off");
+  }
+  function describeModes() {
+    const s = sttMode(), t = ttsMode();
+    $("capsInfo").textContent = `Server: speech recognition ${state.caps.stt || "not installed"}, voice ${state.caps.tts || "not configured"}.`;
+    hint(s === "none" ? "This browser can't do speech recognition and the server has none: type instead."
+                      : `Listening via ${s === "server" ? "Whisper on the laptop" : "this browser"} · voice: ${t === "server" ? state.caps.tts + " on the laptop" : t}`);
+    $("mic").disabled = s === "none";
+  }
+
+  // ------------------------------------------------------------------ init
+  async function init() {
+    applyPrefsToUI();
+    if (!window.isSecureContext) note("This page is not on HTTPS or localhost, so the browser blocks the microphone. Typing still works. See HOW-TO-RUN.md §4.");
+    if (!state.token) { openPair(); return; }
+    try {
+      const r = await api("/api/v1/voice/capabilities");
+      state.caps = await r.json();
+      const st = await (await api("/api/v1/status")).json();
+      status(st.status === "ok" ? `ready · ${st.config.model}` : "AI model not ready — check the server window", st.status === "ok" ? "ok" : "warn");
+    } catch (e) { if (e.message !== "not paired") status("cannot reach AIRA server", "bad"); return; }
+    describeModes(); face("idle");
+  }
+
+  // ------------------------------------------------------------------ recording (server STT)
+  let rec = null;
+  async function startServerRecording() {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    } catch (e) { micError(e); return; }
+    const mime = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || "";
+    const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
+    const chunks = [];
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(stream), an = ctx.createAnalyser(); an.fftSize = 1024; src.connect(an);
+    const buf = new Float32Array(an.fftSize);
+    const t0 = performance.now(); let spoke = false, lastVoice = t0;
+    rec = { stream, mr, ctx, timer: null, cancelled: false };
+    mr.ondataavailable = e => e.data.size && chunks.push(e.data);
+    mr.onstop = async () => {
+      clearInterval(rec.timer); stream.getTracks().forEach(t => t.stop()); ctx.close(); $("meter").firstChild.style.width = "0";
+      const cancelled = rec.cancelled; rec = null; setRecUI(false);
+      if (cancelled || !chunks.length) { face("idle"); return; }
+      await sendAudio(new Blob(chunks, { type: mr.mimeType || "audio/webm" }));
+    };
+    mr.start(250); setRecUI(true);
+    rec.timer = setInterval(() => {
+      an.getFloatTimeDomainData(buf);
+      let sum = 0; for (const v of buf) sum += v * v;
+      const rms = Math.sqrt(sum / buf.length), now = performance.now();
+      $("meter").firstChild.style.width = Math.min(100, rms * 900) + "%";
+      if (rms > 0.02) { spoke = true; lastVoice = now; }
+      if (prefs.autoStop) {
+        if (spoke && now - lastVoice > 1200) stopRecording();
+        else if (!spoke && now - t0 > 8000) { rec && (rec.cancelled = true); stopRecording(); hint("Didn't hear anything."); }
+      }
+      if (now - t0 > 20000) stopRecording();
+    }, 60);
+  }
+  function stopRecording() { if (rec && rec.mr.state !== "inactive") rec.mr.stop(); }
+
+  async function sendAudio(blob) {
+    face("thinking"); status("transcribing…", "warn");
+    const fd = new FormData(); fd.append("audio", blob, "utterance"); fd.append("language", prefs.lang);
+    try {
+      const r = await api("/api/v1/voice/transcribe", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) { note("Speech recognition failed: " + (j.detail || r.status)); face("error"); status("ready", "ok"); return; }
+      if (!j.text.trim()) { note("Didn't catch that."); face("idle"); status("ready", "ok"); return; }
+      await converse(j.text, `heard in ${j.latency_s}s${j.language ? " · " + j.language : ""}`);
+    } catch (e) { if (e.message !== "not paired") { note("Upload failed: " + e.message); face("error"); } }
+  }
+
+  // ------------------------------------------------------------------ browser STT
+  let recog = null;
+  function startBrowserRecognition() {
+    recog = new SR();
+    recog.lang = prefs.lang === "ta" ? "ta-IN" : "en-IN";
+    recog.interimResults = true; recog.continuous = !prefs.autoStop; recog.maxAlternatives = 1;
+    let interim = null, finalText = "";
+    recog.onresult = ev => {
+      let t = ""; finalText = "";
+      for (const r of ev.results) { if (r.isFinal) finalText += r[0].transcript; else t += r[0].transcript; }
+      if (!interim) interim = bubble("user interim", ""); interim.textContent = finalText + t;
+    };
+    recog.onerror = ev => { if (ev.error === "not-allowed") micError({ name: "NotAllowedError" }); else if (ev.error !== "no-speech" && ev.error !== "aborted") note("Speech recognition: " + ev.error); };
+    recog.onend = () => {
+      setRecUI(false); if (interim) interim.remove(); recog = null;
+      if (finalText.trim()) converse(finalText.trim(), "heard by the browser"); else face("idle");
+    };
+    recog.start(); setRecUI(true);
+  }
+
+  function micError(e) {
+    setRecUI(false); face("error");
+    note(e && e.name === "NotAllowedError"
+      ? (window.isSecureContext ? "Microphone permission denied. Allow it in the browser's site settings." : "Microphone blocked: open AIRA over HTTPS or localhost (HOW-TO-RUN.md §4).")
+      : "Microphone unavailable: " + (e && (e.message || e.name)));
+  }
+
+  function setRecUI(on) {
+    state.recording = on; $("mic").classList.toggle("rec", on);
+    if (on) { face("listening"); status("listening… (tap to stop)", "ok"); }
+  }
+
+  $("mic").onclick = () => {
+    if (state.recording) { recog ? recog.stop() : stopRecording(); return; }
+    stopAll();  // barge-in: interrupt AIRA
+    const mode = sttMode();
+    if (mode === "server") startServerRecording(); else if (mode === "browser") startBrowserRecognition();
+  };
+  document.addEventListener("keydown", e => {
+    if (e.code === "Space" && document.activeElement !== $("text") && !$("pairSheet").classList.contains("open")) { e.preventDefault(); $("mic").click(); }
+  });
+
+  // ------------------------------------------------------------------ conversation
+  $("send").onclick = () => { const t = $("text").value.trim(); if (t) { $("text").value = ""; stopAll(); converse(t); } };
+  $("text").addEventListener("keydown", e => { if (e.key === "Enter") $("send").click(); });
+
+  const SENT = /([.!?।]+["')\]]*)(\s+)/;
+  async function converse(text, how) {
+    const u = bubble("user", text); if (how) meta(u, how);
+    const a = bubble("aira", ""); face("thinking"); status("thinking…", "warn");
+    const ctrl = new AbortController(); state.abort = ctrl; const gen = ++state.speakGen;
+    let buffer = "", full = "", stats = null;
+    const flushSentences = (final) => {
+      let m;
+      while ((m = SENT.exec(buffer))) { const s = buffer.slice(0, m.index + m[1].length).trim(); buffer = buffer.slice(m.index + m[0].length); if (s) speak(s, gen); }
+      if (final && buffer.trim()) { speak(buffer.trim(), gen); buffer = ""; }
+    };
+    try {
+      const r = await api("/api/v1/chat/stream", { method: "POST", signal: ctrl.signal, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(state.session ? { message: text, session_id: state.session } : { message: text }) });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.detail || j.message || r.status); }
+      const reader = r.body.getReader(), dec = new TextDecoder(); let raw = "";
+      for (;;) {
+        const { value, done } = await reader.read(); if (done) break;
+        raw += dec.decode(value, { stream: true });
+        let i;
+        while ((i = raw.indexOf("\n\n")) >= 0) {
+          const block = raw.slice(0, i); raw = raw.slice(i + 2);
+          const ev = (block.match(/^event: (.*)$/m) || [])[1], data = JSON.parse((block.match(/^data: (.*)$/m) || [, "{}"])[1]);
+          if (ev === "start") state.session = data.session_id;
+          else if (ev === "token") { full += data.text; buffer += data.text; a.textContent = full; $("log").scrollTop = $("log").scrollHeight; flushSentences(false); }
+          else if (ev === "done") stats = data.stats;
+          else if (ev === "error") throw new Error(data.message + (data.hint ? " — " + data.hint : ""));
+        }
+      }
+      flushSentences(true);
+      if (stats) meta(a, `${stats.ttft_s != null ? "first word " + stats.ttft_s.toFixed(2) + "s · " : ""}${stats.tokens_per_s} tok/s`);
+      status("ready", "ok");
+    } catch (e) {
+      if (e.name === "AbortError") { meta(a, "(interrupted)"); return; }
+      if (e.message === "not paired") return;
+      a.textContent = full || "⚠ " + e.message; face("error"); status("error", "bad"); return;
+    } finally { state.abort = null; }
+    state.speakQueue.then(() => {
+      if (gen !== state.speakGen) return;
+      face("idle");
+      if (prefs.convo && sttMode() !== "none") setTimeout(() => !state.recording && gen === state.speakGen && $("mic").click(), 300);
+    });
+  }
+
+  // ------------------------------------------------------------------ speech output
+  function speak(sentence, gen) {
+    const mode = ttsMode();
+    if (mode === "off") return;
+    if (mode === "server") {
+      const audioP = api("/api/v1/voice/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: sentence }) })
+        .then(r => r.ok ? r.blob() : Promise.reject(new Error("tts " + r.status))).catch(e => e);  // fetch starts now, plays in order
+      state.speakQueue = state.speakQueue.then(async () => {
+        if (gen !== state.speakGen) return;
+        const blob = await audioP;
+        if (blob instanceof Error) { state.caps.tts = null; note("Server voice failed; using the browser voice."); return browserSay(sentence, gen); }
+        return playBlob(blob, gen);
+      });
+    } else state.speakQueue = state.speakQueue.then(() => browserSay(sentence, gen));
+  }
+  function playBlob(blob, gen) {
+    return new Promise(res => {
+      if (gen !== state.speakGen) return res();
+      const url = URL.createObjectURL(blob), au = new Audio(url); state.audio = au;
+      au.onplay = () => { face("speaking"); status("speaking… (tap 🎤 to interrupt)", "ok"); };
+      const end = () => { URL.revokeObjectURL(url); if (state.audio === au) state.audio = null; res(); };
+      au.onended = end; au.onerror = end; au.play().catch(end);
+    });
+  }
+  function pickVoice(text) {
+    const voices = speechSynthesis.getVoices(), ta = hasTamil(text);
+    return (ta ? voices.find(v => v.lang.startsWith("ta")) : null)
+        || voices.find(v => v.lang === "en-IN") || voices.find(v => v.lang.startsWith("en")) || null;
+  }
+  function browserSay(text, gen) {
+    return new Promise(res => {
+      if (gen !== state.speakGen || !("speechSynthesis" in window)) return res();
+      const u = new SpeechSynthesisUtterance(text);
+      const v = pickVoice(text); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = hasTamil(text) ? "ta-IN" : "en-IN";
+      u.rate = prefs.rate; u.pitch = 1.15;
+      u.onstart = () => { face("speaking"); status("speaking… (tap 🎤 to interrupt)", "ok"); };
+      u.onend = res; u.onerror = res;
+      speechSynthesis.speak(u);
+    });
+  }
+  function stopAll() {
+    state.speakGen++;
+    if (state.abort) state.abort.abort();
+    if (state.audio) { state.audio.pause(); state.audio = null; }
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    state.speakQueue = Promise.resolve();
+    if (!state.recording) face("idle");
+  }
+  if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+
+  init();
+})();
+</script>
+</body>
+</html>

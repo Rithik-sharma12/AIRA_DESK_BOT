@@ -1,7 +1,9 @@
-# AIRA laptop server — Phase 1 runtime dependencies (Windows 11, Python 3.11/3.12)
+# AIRA laptop server — runtime dependencies (Windows 11, Python 3.11/3.12)
 fastapi>=0.115,<1.0
 uvicorn[standard]>=0.30
 pydantic>=2.7,<3
 pydantic-settings>=2.3,<3
 httpx>=0.27,<1.0
 psutil>=5.9
+python-multipart>=0.0.9     # audio uploads from the web voice interface
+cryptography>=42            # scripts/make_dev_cert.py (HTTPS for phones)

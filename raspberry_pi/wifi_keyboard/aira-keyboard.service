@@ -1,0 +1,47 @@
+[Unit]
+Description=AIRA Wi-Fi keyboard (phone -> uinput virtual keyboard)
+Documentation=file:///opt/aira-keyboard/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aira-kbd
+Group=aira-kbd
+SupplementaryGroups=input
+EnvironmentFile=-/etc/default/aira-keyboard
+WorkingDirectory=/opt/aira-keyboard
+ExecStart=/usr/bin/python3 -m wifi_keyboard $ARGS
+StateDirectory=aira-keyboard
+StateDirectoryMode=0700
+# Show the phone URL and pairing code on AIRA's own screen (text console) and in the journal.
+StandardOutput=journal+console
+StandardError=journal+console
+Restart=on-failure
+RestartSec=3
+
+# Hardening: the service can open /dev/uinput and the network, nothing else.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+DevicePolicy=closed
+DeviceAllow=/dev/uinput rw
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target

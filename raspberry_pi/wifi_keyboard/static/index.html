@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="mobile-web-app-capable" content="yes">
+<title>AIRA Keyboard</title>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --key:#21262d; --key2:#30363d; --ink:#e6edf3; --muted:#8b949e;
+          --acc:#2f81f7; --ok:#3fb950; --warn:#d29922; --bad:#f85149; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  body { padding:10px 10px calc(10px + env(safe-area-inset-bottom)); }
+  header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  header h1 { font-size:17px; margin:0; flex:1; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--bad); flex:none; }
+  .dot.ok { background:var(--ok); } .dot.wait { background:var(--warn); }
+  #status { color:var(--muted); font-size:13px; }
+  .panel { background:var(--panel); border-radius:12px; padding:10px; margin-bottom:10px; }
+  #pair input { width:100%; font-size:28px; letter-spacing:8px; text-align:center; padding:10px;
+                background:var(--key); color:var(--ink); border:1px solid var(--key2); border-radius:10px; }
+  #pair input#devname { font-size:15px; letter-spacing:0; margin-top:8px; }
+  button { font:inherit; color:var(--ink); background:var(--key); border:1px solid var(--key2);
+           border-radius:9px; padding:0; min-height:46px; touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+  button:active, button.held { background:var(--key2); }
+  button.wide { width:100%; margin-top:8px; background:var(--acc); border-color:var(--acc); font-weight:600; }
+  button.mod.on { background:#1f3a5f; border-color:var(--acc); }
+  button.mod.lock { background:var(--acc); border-color:var(--acc); }
+  #type { width:100%; height:64px; resize:none; font-size:17px; padding:10px; border-radius:10px;
+          background:var(--key); color:var(--ink); border:1px solid var(--key2); }
+  .hint { color:var(--muted); font-size:12px; margin-top:6px; }
+  .grid { display:grid; gap:6px; margin-top:6px; }
+  .g6 { grid-template-columns:repeat(6,1fr); } .g4 { grid-template-columns:repeat(4,1fr); }
+  .g3 { grid-template-columns:repeat(3,1fr); }
+  .small button { min-height:40px; font-size:13px; }
+  details summary { color:var(--muted); font-size:13px; margin-top:8px; cursor:pointer; }
+  #toast { position:fixed; left:10px; right:10px; bottom:calc(10px + env(safe-area-inset-bottom)); background:#3d2e00;
+           color:#f0d48a; border-radius:10px; padding:10px; font-size:13px; display:none; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot"></span>
+  <h1>AIRA Keyboard</h1>
+  <span id="status">connecting…</span>
+</header>
+
+<section class="panel hidden" id="pair">
+  <div>Enter the 6-digit code shown on AIRA's screen.</div>
+  <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000">
+  <input id="devname" placeholder="Name for this phone (e.g. Redmi)" maxlength="40">
+  <button class="wide" id="pairBtn">Pair this phone</button>
+  <div class="hint" id="pairMsg">The code changes every time the keyboard service starts.</div>
+</section>
+
+<section id="kbd" class="hidden">
+  <div class="panel">
+    <textarea id="type" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"
+              placeholder="Tap here and type — each change is sent as key presses"></textarea>
+    <div class="hint">Corrections and backspace are mirrored. Turn off Gboard suggestions for faster typing.</div>
+    <div class="grid g6">
+      <button data-k="KEY_ESC">Esc</button><button data-k="KEY_TAB">Tab</button>
+      <button class="mod" data-m="KEY_LEFTCTRL">Ctrl</button><button class="mod" data-m="KEY_LEFTALT">Alt</button>
+      <button class="mod" data-m="KEY_LEFTSHIFT">Shift</button><button class="mod" data-m="KEY_LEFTMETA">Super</button>
+    </div>
+    <div class="grid g6">
+      <button data-k="KEY_HOME">Home</button><button data-k="KEY_UP" data-rep>▲</button><button data-k="KEY_END">End</button>
+      <button data-k="KEY_PAGEUP">PgUp</button><button data-k="KEY_INSERT">Ins</button><button data-k="KEY_BACKSPACE" data-rep>⌫</button>
+      <button data-k="KEY_LEFT" data-rep>◀</button><button data-k="KEY_DOWN" data-rep>▼</button><button data-k="KEY_RIGHT" data-rep>▶</button>
+      <button data-k="KEY_PAGEDOWN">PgDn</button><button data-k="KEY_DELETE" data-rep>Del</button><button data-k="KEY_ENTER">⏎</button>
+    </div>
+    <div class="grid g6 small">
+      <button data-k="KEY_F1">F1</button><button data-k="KEY_F2">F2</button><button data-k="KEY_F3">F3</button>
+      <button data-k="KEY_F4">F4</button><button data-k="KEY_F5">F5</button><button data-k="KEY_F6">F6</button>
+      <button data-k="KEY_F7">F7</button><button data-k="KEY_F8">F8</button><button data-k="KEY_F9">F9</button>
+      <button data-k="KEY_F10">F10</button><button data-k="KEY_F11">F11</button><button data-k="KEY_F12">F12</button>
+    </div>
+    <details>
+      <summary>Shortcuts</summary>
+      <div class="grid g4 small">
+        <button data-k="KEY_C" data-mods="KEY_LEFTCTRL">Ctrl+C</button><button data-k="KEY_D" data-mods="KEY_LEFTCTRL">Ctrl+D</button>
+        <button data-k="KEY_Z" data-mods="KEY_LEFTCTRL">Ctrl+Z</button><button data-k="KEY_L" data-mods="KEY_LEFTCTRL">Ctrl+L</button>
+        <button data-k="KEY_A" data-mods="KEY_LEFTCTRL">Ctrl+A</button><button data-k="KEY_E" data-mods="KEY_LEFTCTRL">Ctrl+E</button>
+        <button data-k="KEY_R" data-mods="KEY_LEFTCTRL">Ctrl+R</button><button data-k="KEY_U" data-mods="KEY_LEFTCTRL">Ctrl+U</button>
+        <button data-k="KEY_F1" data-mods="KEY_LEFTCTRL,KEY_LEFTALT">Console 1</button>
+        <button data-k="KEY_F2" data-mods="KEY_LEFTCTRL,KEY_LEFTALT">Console 2</button>
+        <button data-k="KEY_F3" data-mods="KEY_LEFTCTRL,KEY_LEFTALT">Console 3</button>
+        <button id="release">Release keys</button>
+      </div>
+      <div class="grid g3 small">
+        <button id="forget">Forget this phone</button>
+      </div>
+      <div class="hint">Ctrl/Alt/Shift/Super: tap once for the next key, tap twice to lock, tap again to release.</div>
+    </details>
+  </div>
+</section>
+<div id="toast"></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const TOKEN_KEY = "aira-kbd-token";
+  let ws, retry = 0, prev = "", composing = false;
+  const mods = {};  // key -> "on" (one-shot) | "lock"
+
+  function status(text, cls) { $("status").textContent = text; $("dot").className = "dot " + (cls || ""); }
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.display = "block";
+                        clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 3500); }
+  function show(which) { $("pair").classList.toggle("hidden", which !== "pair"); $("kbd").classList.toggle("hidden", which !== "kbd"); }
+  function send(obj) { if (ws && ws.readyState === 1) { ws.send(JSON.stringify(obj)); return true; } toast("Not connected"); return false; }
+
+  function connect() {
+    status("connecting…", "wait");
+    ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+    ws.onopen = () => {
+      retry = 0;
+      const token = localStorage.getItem(TOKEN_KEY);
+      ws.send(JSON.stringify(token ? { t: "auth", token } : { t: "hello" }));
+    };
+    ws.onmessage = ev => {
+      const m = JSON.parse(ev.data);
+      if (m.t === "ready") { status("connected · " + m.layout.toUpperCase() + " layout", "ok"); show("kbd"); }
+      else if (m.t === "paired") { localStorage.setItem(TOKEN_KEY, m.token); status("connected · " + m.layout.toUpperCase() + " layout", "ok"); show("kbd"); }
+      else if (m.t === "unpaired") { localStorage.removeItem(TOKEN_KEY); ws.send(JSON.stringify({ t: "hello" })); }
+      else if (m.t === "need_code") { show("pair"); status(m.locked ? "pairing locked" : "pairing", "wait");
+        $("pairMsg").textContent = m.locked ? "Too many wrong codes. Restart the keyboard service on AIRA." :
+                                              "The code is now shown on AIRA's screen."; }
+      else if (m.t === "err") { if (m.left !== undefined) $("pairMsg").textContent = m.msg + (m.left ? ` — ${m.left} tries left` : ""); else toast(m.msg); }
+      else if (m.t === "skipped") toast("Can't type on the Pi console: " + m.chars);
+    };
+    ws.onclose = () => { status("disconnected — retrying", ""); setTimeout(connect, Math.min(8000, 500 * 2 ** retry++)); };
+  }
+
+  $("pairBtn").onclick = () => {
+    const code = $("code").value.replace(/\D/g, "");
+    if (code.length !== 6) { $("pairMsg").textContent = "The code has 6 digits."; return; }
+    send({ t: "pair", code, name: $("devname").value || "phone" });
+  };
+  $("forget").onclick = () => { localStorage.removeItem(TOKEN_KEY); location.reload(); };
+  $("release").onclick = () => { clearMods(true); send({ t: "release_all" }); };
+
+  // ---- modifiers
+  function activeMods() { return Object.keys(mods); }
+  function paintMods() { document.querySelectorAll("button.mod").forEach(b => {
+    const s = mods[b.dataset.m]; b.classList.toggle("on", s === "on"); b.classList.toggle("lock", s === "lock"); }); }
+  function clearMods(all) { for (const k of Object.keys(mods)) if (all || mods[k] === "on") delete mods[k]; paintMods(); }
+  document.querySelectorAll("button.mod").forEach(b => b.addEventListener("click", () => {
+    const k = b.dataset.m; mods[k] = !mods[k] ? "on" : mods[k] === "on" ? "lock" : undefined;
+    if (!mods[k]) delete mods[k]; paintMods(); }));
+
+  // ---- keys (pointerdown keeps the phone keyboard open; held keys repeat)
+  function pressKey(btn) {
+    const extra = btn.dataset.mods ? btn.dataset.mods.split(",") : [];
+    send({ t: "key", key: btn.dataset.k, mods: [...new Set([...activeMods(), ...extra])] });
+    clearMods(false);
+  }
+  document.querySelectorAll("button[data-k]").forEach(b => {
+    b.addEventListener("pointerdown", e => {
+      e.preventDefault(); b.classList.add("held"); pressKey(b);
+      if (b.hasAttribute("data-rep")) b._t = setTimeout(() => { b._i = setInterval(() => pressKey(b), 70); }, 400);
+    });
+    const stop = () => { b.classList.remove("held"); clearTimeout(b._t); clearInterval(b._i); };
+    b.addEventListener("pointerup", stop); b.addEventListener("pointerleave", stop); b.addEventListener("pointercancel", stop);
+  });
+  document.querySelectorAll("button.mod, #release, #forget").forEach(b => b.addEventListener("pointerdown", e => e.preventDefault()));
+
+  // ---- typing box: mirror every change as backspaces + new text (works with Gboard autocorrect).
+  // An invisible marker stays in the box so Backspace on an "empty" box is still seen.
+  const box = $("type"), MARK = "\u200B";
+  function reset() { box.value = MARK; prev = MARK; box.setSelectionRange(1, 1); }
+  function flush() {
+    const cur = box.value;
+    let p = 0; while (p < prev.length && p < cur.length && prev[p] === cur[p]) p++;
+    const del = prev.length - p, add = cur.slice(p).split(MARK).join("");
+    if (del > 0) send({ t: "key", key: "KEY_BACKSPACE", repeat: del });
+    if (add) {
+      const m = activeMods();
+      if (m.length && add.length === 1) { send({ t: "text", s: add, mods: m }); clearMods(false); }
+      else send({ t: "text", s: add });
+    }
+    prev = cur;
+    if (!composing && (!cur.startsWith(MARK) || cur.length > 80)) reset();
+  }
+  box.addEventListener("input", flush);
+  box.addEventListener("compositionstart", () => composing = true);
+  box.addEventListener("compositionend", () => { composing = false; flush(); });
+  box.addEventListener("focus", () => setTimeout(() => box.setSelectionRange(box.value.length, box.value.length), 0));
+  reset();
+
+  setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "ping" })); }, 20000);
+  connect();
+})();
+</script>
+</body>
+</html>

@@ -11,17 +11,21 @@ from fastapi.responses import JSONResponse
 
 from . import __version__
 from .agent.conversation import ConversationManager
+from .api.routes import build_router
+from .api.web_routes import build_web_router
 from .config import Settings
 from .llm.base import LLMError, LLMProvider
 from .llm.factory import create_provider
 from .monitoring.metrics import MetricsRecorder
 from .security.auth import make_api_key_dependency
-from .api.routes import build_router
+from .security.web_pairing import WebPairing
+from .voice.service import VoiceService
 
 log = logging.getLogger("aira.app")
 
 
-def create_app(settings: Settings, provider: LLMProvider | None = None) -> FastAPI:
+def create_app(settings: Settings, provider: LLMProvider | None = None,
+               voice: VoiceService | None = None) -> FastAPI:
     settings.validate_for_startup()
 
     @asynccontextmanager
@@ -40,13 +44,19 @@ def create_app(settings: Settings, provider: LLMProvider | None = None) -> FastA
                     log.info("Model warm-up finished in %.1f s", secs)
                 except LLMError as exc:
                     log.error("Warm-up failed: %s", exc)
+        if settings.web_ui_enabled:
+            caps = st.voice.capabilities()
+            log.info("Web UI: speech recognition on %s, speech output on %s",
+                     caps["stt"] or "the browser", caps["tts"] or "the browser")
+            log.warning("Web UI pairing code: %s", st.web_pairing.pretty_code)
         yield
+        await st.voice.aclose()
         await st.provider.aclose()
 
     app = FastAPI(
         title="AIRA Laptop Server",
         version=__version__,
-        description="AI brain for AIRA, the desktop companion. Phase 1: local LLM conversation.",
+        description="AI brain for AIRA, the desktop companion: local LLM conversation and a web voice interface.",
         lifespan=lifespan,
     )
     app.state.settings = settings
@@ -59,6 +69,8 @@ def create_app(settings: Settings, provider: LLMProvider | None = None) -> FastA
     )
     app.state.metrics = MetricsRecorder(settings.metrics_window)
     app.state.started_at = time.monotonic()
+    app.state.web_pairing = WebPairing(settings.data_dir / "web_devices.json")
+    app.state.voice = voice or VoiceService(settings)
 
     @app.exception_handler(LLMError)
     async def _llm_error(_: Request, exc: LLMError) -> JSONResponse:
@@ -67,5 +79,7 @@ def create_app(settings: Settings, provider: LLMProvider | None = None) -> FastA
             content={"code": exc.code, "message": str(exc), "hint": exc.hint},
         )
 
-    app.include_router(build_router(make_api_key_dependency(settings.api_key)))
+    require = make_api_key_dependency(settings.api_key, extra_check=app.state.web_pairing.check)
+    app.include_router(build_router(require))
+    app.include_router(build_web_router(require))
     return app
