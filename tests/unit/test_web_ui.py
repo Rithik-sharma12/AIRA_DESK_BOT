@@ -153,3 +153,19 @@ def test_auto_capabilities_follow_settings(tmp_path):
     assert v.tts_name == "azure" and v.stt_name is None
     s2 = make_settings(tts_provider="piper", tts_piper_model=tmp_path / "missing.onnx")
     assert VoiceService(s2).tts_name is None
+
+
+def test_mascot_sprites_are_served_and_nothing_else():
+    from fastapi.testclient import TestClient
+
+    from laptop_server.app import create_app
+    from tests.conftest import FakeProvider, make_settings
+
+    c = TestClient(create_app(make_settings(), provider=FakeProvider()))
+    m = c.get("/mascot/manifest.json")
+    assert m.status_code == 200 and "idle" in m.json()["emotions"]
+    img = c.get("/mascot/idle/frame_00.png")
+    assert img.status_code == 200 and img.headers["content-type"] == "image/png" and img.content[:4] == b"\x89PNG"
+    for bad in ("/mascot/idle/missing.png", "/mascot/IDLE/frame_00.png", "/mascot/idle/frame_00.py",
+                "/mascot/..%2F..%2F..%2Flaptop_server/config.png", "/mascot/idle/..%2Fmanifest.json"):
+        assert c.get(bad).status_code == 404, bad

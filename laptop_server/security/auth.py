@@ -21,8 +21,22 @@ audit = logging.getLogger("aira.audit")
 _bearer = HTTPBearer(auto_error=False)
 
 
-def make_api_key_dependency(expected: SecretStr, extra_check: Callable[[str], bool] | None = None):
+def make_token_checker(expected: SecretStr, extra_check: Callable[[str], bool] | None = None
+                       ) -> Callable[[str | None], bool]:
+    """Constant-time check of the API key, falling back to paired-device tokens."""
     expected_bytes = expected.get_secret_value().encode("utf-8")
+
+    def check(token: str | None) -> bool:
+        ok = bool(token) and bool(expected_bytes) and hmac.compare_digest(token.encode("utf-8"), expected_bytes)
+        if not ok and token and extra_check is not None:
+            ok = extra_check(token)
+        return ok
+
+    return check
+
+
+def make_api_key_dependency(expected: SecretStr, extra_check: Callable[[str], bool] | None = None):
+    check = make_token_checker(expected, extra_check)
 
     async def require_api_key(
         request: Request,
@@ -30,10 +44,7 @@ def make_api_key_dependency(expected: SecretStr, extra_check: Callable[[str], bo
         x_api_key: str | None = Header(default=None, alias="X-API-Key"),
     ) -> None:
         token = creds.credentials if creds else x_api_key
-        ok = bool(token) and bool(expected_bytes) and hmac.compare_digest(token.encode("utf-8"), expected_bytes)
-        if not ok and token and extra_check is not None:
-            ok = extra_check(token)
-        if not ok:
+        if not check(token):
             client = request.client.host if request.client else "unknown"
             audit.warning("auth_failed client=%s path=%s", client, request.url.path)
             raise HTTPException(

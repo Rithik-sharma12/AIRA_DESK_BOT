@@ -3,124 +3,193 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b0f17">
+<meta name="theme-color" content="#F5F5DC">
 <title>AIRA</title>
 <style>
-  :root { --bg:#0b0f17; --panel:#121826; --panel2:#1a2233; --line:#263046; --ink:#e7edf7; --muted:#8a96ab;
-          --acc:#38bdf8; --acc2:#a78bfa; --ok:#34d399; --warn:#fbbf24; --bad:#f87171; }
+  /* AIRA web: neo-brutalist design system — thick black strokes, squared corners, solid accent
+     blocks, hard shadows, strict grid, high contrast, focus always visible, 44px hit areas. */
+  :root {
+    --teal:#00C2CB; --magenta:#FF00FF; --yellow:#FFD700; --black:#000; --white:#fff; --paper:#F5F5DC;
+    --ink:#000; --muted:#4a4a40; --line:3px solid #000; --r:4px;
+    --sh0:none; --sh1:4px 4px 0 #000; --sh2:8px 8px 0 #000;
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+    --font:"Archivo","Inter","Segoe UI","Roboto","Helvetica Neue",Arial,"Noto Sans Tamil",sans-serif;
+  }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
-              font:15px/1.45 system-ui,-apple-system,"Segoe UI","Noto Sans Tamil",sans-serif; }
-  body { display:flex; flex-direction:column; max-width:760px; margin:0 auto;
-         padding:10px 12px calc(12px + env(safe-area-inset-bottom)); }
-  header { display:flex; align-items:center; gap:10px; }
-  header h1 { font-size:18px; margin:0; letter-spacing:.5px; }
-  .dot { width:9px; height:9px; border-radius:50%; background:var(--muted); }
-  .dot.ok { background:var(--ok); } .dot.warn { background:var(--warn); } .dot.bad { background:var(--bad); }
-  #status { color:var(--muted); font-size:13px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  button { font:inherit; color:var(--ink); background:var(--panel2); border:1px solid var(--line);
-           border-radius:10px; padding:8px 12px; cursor:pointer; touch-action:manipulation; }
-  button:disabled { opacity:.45; cursor:default; }
-  .icon { padding:6px 10px; }
+  html,body { margin:0; height:100%; background:var(--paper); color:var(--ink); font:500 16px/1.45 var(--font); }
+  body { display:flex; flex-direction:column; padding:var(--s3) var(--s3) calc(var(--s3) + env(safe-area-inset-bottom)); }
+  :focus-visible { outline:3px solid var(--yellow); outline-offset:2px; box-shadow:0 0 0 6px #000; }
+  button { font:800 14px/1 var(--font); text-transform:uppercase; letter-spacing:.04em; color:var(--ink);
+           background:var(--white); border:var(--line); border-radius:var(--r); box-shadow:var(--sh1);
+           min-height:44px; padding:0 var(--s4); cursor:pointer; touch-action:manipulation;
+           transition:transform .06s, box-shadow .06s; }
+  button:hover { background:#fffbe6; }
+  button:active { transform:translate(4px,4px); box-shadow:none; }
+  button:disabled { opacity:.45; cursor:default; transform:none; box-shadow:var(--sh1); }
+  button.icon { width:44px; padding:0; display:inline-grid; place-items:center; }
+  svg.i { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2.6; stroke-linecap:square; stroke-linejoin:miter; }
 
-  /* face */
-  #face { position:relative; height:150px; margin:8px 0 6px; display:flex; align-items:center; justify-content:center; }
-  #face svg { width:260px; height:140px; }
-  .eye { fill:var(--acc); transform-box:fill-box; transform-origin:center; transition:transform .25s, fill .25s; }
-  .mouth { fill:var(--acc); opacity:0; transform-box:fill-box; transform-origin:center; transition:opacity .2s; }
-  #face.idle .eye { animation: blink 5s infinite; }
-  #face.listening .eye { fill:var(--ok); transform:scale(1.08,1.12); }
-  #face.thinking .eye { fill:var(--acc2); animation: look 1.4s ease-in-out infinite; }
-  #face.speaking .mouth { opacity:1; animation: talk .32s ease-in-out infinite alternate; }
-  #face.error .eye { fill:var(--bad); transform:scaleY(.35); }
-  #ring { position:absolute; width:180px; height:180px; border-radius:50%; border:2px solid var(--ok);
-          opacity:0; transform:scale(.6); transition:opacity .2s; pointer-events:none; }
-  #face.listening #ring { opacity:.55; }
-  @keyframes blink { 0%,94%,100% { transform:scaleY(1); } 96% { transform:scaleY(.1); } }
-  @keyframes look { 0%,100% { transform:translateX(-10px); } 50% { transform:translateX(10px); } }
-  @keyframes talk { from { transform:scaleY(.35); } to { transform:scaleY(1.25); } }
+  /* header */
+  header { display:flex; align-items:center; gap:var(--s3); padding-bottom:var(--s3); border-bottom:var(--line); }
+  .logo { font:900 32px/1 var(--font); letter-spacing:-.02em; text-transform:uppercase; }
+  .tag { font:800 11px/1 var(--font); text-transform:uppercase; letter-spacing:.06em; border:2px solid #000;
+         border-radius:var(--r); padding:5px 7px; background:var(--white); white-space:nowrap; }
+  #statusWrap { flex:1; min-width:0; display:flex; align-items:center; gap:var(--s2); }
+  .dot { width:12px; height:12px; flex:none; border:2px solid #000; background:var(--white); }
+  .dot.ok { background:var(--teal); } .dot.warn { background:var(--yellow); } .dot.bad { background:var(--magenta); }
+  #status { font:700 12px/1.2 var(--font); text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* layout: stage (mascot) + talk (conversation) */
+  main { flex:1; min-height:0; display:grid; gap:var(--s4); padding-top:var(--s4); grid-template-columns:minmax(0,1fr);
+         grid-template-rows:auto minmax(0,1fr); }
+  main > * { min-width:0; }
+  @media (min-width:900px) { main { grid-template-columns:340px minmax(0,1fr); grid-template-rows:minmax(0,1fr); gap:var(--s5); }
+                             .stage { position:sticky; top:0; align-self:start; } }
+  .stage { display:flex; flex-direction:column; gap:var(--s3); }
+  #face { position:relative; background:#0d0820; border:var(--line); border-radius:var(--r); box-shadow:var(--sh2);
+          overflow:hidden; aspect-ratio:5/4; width:min(calc(100% - 8px), calc(26vh * 1.25)); margin:0 auto; }
+  @media (min-width:900px) { #face { width:calc(100% - 8px); margin:0; } }
+  #mascot { display:block; width:100%; height:100%; object-fit:cover; image-rendering:pixelated; }
+  #stateTag { position:absolute; left:var(--s2); bottom:var(--s2); }
+  #face.idle #stateTag { background:var(--white); }
+  #face.listening #stateTag { background:var(--teal); }
+  #face.thinking #stateTag { background:var(--yellow); }
+  #face.speaking #stateTag { background:var(--white); }
+  #face.error #stateTag { background:var(--magenta); color:#000; }
+  #face.listening { box-shadow:8px 8px 0 var(--teal), 8px 8px 0 3px #000; }
+  #piTag { color:var(--muted); } #piTag.on { background:var(--teal); color:#000; }
+  .quick button[aria-pressed="true"] { background:var(--teal); }
+  .quick { display:none; flex-wrap:wrap; gap:var(--s2); }
+  .quick button { min-height:36px; font-size:12px; padding:0 var(--s3); }
+  @media (min-width:900px) { .quick { display:flex; } }
+  .section-title { display:none; font:900 13px/1 var(--font); text-transform:uppercase; letter-spacing:.08em; margin:var(--s2) 0 0; }
+  @media (min-width:900px) { .section-title { display:block; } }
 
   /* conversation */
-  #log { flex:1; overflow-y:auto; padding:6px 2px; display:flex; flex-direction:column; gap:8px; min-height:120px; }
-  .msg { max-width:86%; padding:9px 12px; border-radius:14px; white-space:pre-wrap; word-wrap:break-word; }
-  .msg.user { align-self:flex-end; background:#1e3a5f; border-bottom-right-radius:4px; }
-  .msg.aira { align-self:flex-start; background:var(--panel); border:1px solid var(--line); border-bottom-left-radius:4px; }
-  .msg.note { align-self:center; color:var(--muted); font-size:12.5px; background:none; padding:2px 8px; text-align:center; }
+  .talk { display:flex; flex-direction:column; min-height:0; }
+  #log { flex:1; overflow-y:auto; padding:var(--s2) 12px var(--s3) 2px; display:flex; flex-direction:column; gap:var(--s3); min-height:120px; }
+  .msg { max-width:86%; padding:var(--s3) var(--s4); border:var(--line); border-radius:var(--r); white-space:pre-wrap;
+         word-wrap:break-word; box-shadow:var(--sh1); font-weight:500; }
+  .msg.user { align-self:flex-end; background:var(--yellow); }
+  .msg.aira { align-self:flex-start; background:var(--white); }
+  .msg.aira::before { content:"AIRA"; display:block; font:900 11px/1 var(--font); letter-spacing:.08em; margin-bottom:6px; color:var(--black); }
+  .msg.user::before { content:"YOU"; display:block; font:900 11px/1 var(--font); letter-spacing:.08em; margin-bottom:6px; }
+  .msg.note { align-self:center; max-width:94%; color:var(--muted); font:600 12.5px/1.35 var(--font); background:none; border:none;
+              box-shadow:none; padding:2px 8px; text-align:center; }
   .msg.interim { opacity:.6; font-style:italic; }
-  .meta { display:block; color:var(--muted); font-size:11.5px; margin-top:4px; }
+  .msg.reminder { align-self:stretch; max-width:none; background:var(--magenta); font-weight:800; }
+  .msg.reminder::before { content:"REMINDER"; display:block; font:900 11px/1 var(--font); letter-spacing:.08em; margin-bottom:6px; }
+  .meta { display:block; color:var(--muted); font:600 11.5px/1.3 var(--font); text-transform:uppercase; letter-spacing:.04em; margin-top:8px; }
+  .chip { display:inline-block; font:800 11px/1 var(--font); text-transform:uppercase; letter-spacing:.05em; color:#000;
+          background:var(--teal); border:2px solid #000; border-radius:var(--r); padding:5px 7px; margin:8px 6px 0 0; }
+  .chip.fail { background:var(--magenta); }
+  .confirm { display:flex; gap:var(--s3); margin-top:var(--s3); }
+  .confirm button { flex:1; }
+  .confirm .yes { background:var(--teal); }
 
   /* controls */
-  #controls { display:flex; align-items:center; gap:10px; margin-top:8px; }
-  #mic { width:68px; height:68px; border-radius:50%; flex:none; font-size:26px; padding:0;
-         background:linear-gradient(145deg,#0ea5e9,#6366f1); border:none; box-shadow:0 4px 18px #0ea5e955; }
-  #mic.rec { background:linear-gradient(145deg,#ef4444,#f97316); box-shadow:0 0 0 6px #ef444433; }
-  #mic.busy { background:var(--panel2); box-shadow:none; }
-  #textrow { flex:1; display:flex; gap:8px; }
-  #text { flex:1; min-width:0; font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line);
-          border-radius:12px; padding:11px 12px; }
-  #meter { height:4px; background:var(--panel2); border-radius:2px; margin-top:8px; overflow:hidden; }
-  #meter div { height:100%; width:0; background:var(--ok); transition:width .05s; }
-  #hint { color:var(--muted); font-size:12px; margin-top:6px; text-align:center; min-height:16px; }
+  #meter { height:14px; background:var(--white); border:var(--line); border-radius:var(--r); margin:var(--s3) 8px 0 0; overflow:hidden; }
+  #meter div { height:100%; width:0; background:var(--teal); border-right:3px solid #000; transition:width .05s; }
+  #controls { display:flex; align-items:stretch; gap:var(--s3); margin:var(--s3) 8px 0 0; }
+  #mic { width:64px; min-height:64px; padding:0; flex:none; background:var(--teal); box-shadow:var(--sh2); display:grid; place-items:center; }
+  #mic svg.i { width:28px; height:28px; }
+  #mic.rec { background:var(--magenta); animation:pulse 1s steps(2) infinite; }
+  @keyframes pulse { 50% { box-shadow:4px 4px 0 #000; transform:translate(4px,4px); } }
+  #textrow { flex:1; min-width:0; display:flex; gap:var(--s3); }
+  #text { flex:1; min-width:0; font:600 16px/1.2 var(--font); color:var(--ink); background:var(--white); border:var(--line);
+          border-radius:var(--r); padding:0 var(--s4); min-height:64px; box-shadow:var(--sh1); }
+  #text::placeholder { color:#8a8a7a; text-transform:uppercase; font-size:13px; letter-spacing:.05em; font-weight:800; }
+  #send { width:64px; min-height:64px; padding:0; background:var(--yellow); display:grid; place-items:center; }
+  #hint { color:var(--muted); font:700 11.5px/1.3 var(--font); text-transform:uppercase; letter-spacing:.04em; margin-top:var(--s3); text-align:center; min-height:15px; }
 
-  /* sheets */
-  .sheet { position:fixed; inset:0; background:#000a; display:none; align-items:flex-end; justify-content:center; z-index:5; }
+  /* modals */
+  .sheet { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:5; padding:var(--s4); }
   .sheet.open { display:flex; }
-  .card { width:100%; max-width:520px; background:var(--panel); border:1px solid var(--line); border-radius:16px 16px 0 0;
-          padding:16px; padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
-  .card h2 { margin:0 0 10px; font-size:16px; }
-  .row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:10px 0; }
-  .row label { color:var(--muted); }
-  select, .card input { font:inherit; color:var(--ink); background:var(--panel2); border:1px solid var(--line);
-                        border-radius:8px; padding:7px; }
-  #code { width:100%; font-size:30px; letter-spacing:10px; text-align:center; margin:8px 0; }
-  #pairMsg { color:var(--muted); font-size:13px; min-height:18px; }
-  .primary { background:var(--acc); color:#04121c; border-color:var(--acc); font-weight:600; width:100%; padding:11px; }
+  .card { width:100%; max-width:480px; max-height:92vh; overflow:auto; background:var(--paper); border:var(--line); border-radius:var(--r);
+          box-shadow:12px 12px 0 #000; padding:var(--s5); }
+  .card h2 { margin:0 0 var(--s3); font:900 22px/1.1 var(--font); text-transform:uppercase; }
+  .card p { margin:0 0 var(--s3); color:var(--muted); font-weight:600; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:var(--s3); margin:var(--s3) 0; }
+  .row label { font:800 12px/1.2 var(--font); text-transform:uppercase; letter-spacing:.04em; }
+  select, .card input { font:600 15px/1.2 var(--font); color:var(--ink); background:var(--white); border:var(--line);
+                        border-radius:var(--r); padding:0 10px; min-height:44px; }
+  input[type=checkbox] { width:26px; height:26px; min-height:26px; accent-color:#000; }
+  input[type=range] { accent-color:#000; min-height:auto; border:none; background:none; }
+  #code { width:100%; font:900 34px/1 var(--font); letter-spacing:12px; text-align:center; margin:var(--s2) 0 var(--s3); min-height:64px; }
+  #pairMsg { color:var(--muted); font:700 12.5px/1.3 var(--font); min-height:18px; margin-top:var(--s2); }
+  .primary { background:var(--teal); width:100%; min-height:52px; font-size:16px; }
+  #forgetBtn { background:var(--magenta); }
+  #capsInfo { color:var(--muted); font:600 12.5px/1.35 var(--font); }
 </style>
 </head>
 <body>
 <header>
-  <span class="dot" id="dot"></span>
-  <h1>AIRA</h1>
-  <span id="status">starting…</span>
-  <button class="icon" id="newBtn" title="New conversation">↺</button>
-  <button class="icon" id="setBtn" title="Settings">⚙</button>
+  <span class="logo">AIRA</span>
+  <div id="statusWrap"><span class="dot" id="dot"></span><span id="status">starting…</span></div>
+  <span class="tag" id="piTag" title="AIRA's Raspberry Pi screen: not connected">Pi screen</span>
+  <button class="icon" id="newBtn" title="New conversation" aria-label="New conversation">
+    <svg class="i" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg></button>
+  <button class="icon" id="setBtn" title="Settings" aria-label="Settings">
+    <svg class="i" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><rect x="14" y="5" width="4" height="4"/><rect x="6" y="15" width="4" height="4"/></svg></button>
 </header>
 
-<div id="face" class="idle">
-  <div id="ring"></div>
-  <svg viewBox="0 0 260 140" aria-hidden="true">
-    <rect class="eye" x="58" y="30" width="46" height="62" rx="20"/>
-    <rect class="eye" x="156" y="30" width="46" height="62" rx="20"/>
-    <rect class="mouth" x="110" y="108" width="40" height="10" rx="5"/>
-  </svg>
-</div>
+<main>
+  <section class="stage" aria-label="AIRA">
+    <div id="face" class="idle">
+      <img id="mascot" src="/mascot/idle/frame_00.png" alt="AIRA, your desk companion">
+      <span class="tag" id="stateTag">Ready</span>
+    </div>
+    <p class="section-title">Quick actions</p>
+    <div class="quick" id="quick">
+      <button data-say="How is my laptop doing?">Laptop status</button>
+      <button data-say="volume up">Volume up</button>
+      <button data-say="pause the music">Play / pause</button>
+      <button data-say="set a timer for 5 minutes">Timer 5 min</button>
+      <button data-say="what reminders do I have?">Reminders</button>
+      <button data-say="lock the laptop">Lock</button>
+    </div>
+    <p class="section-title">AIRA's screen (Pi)</p>
+    <div class="quick" id="piScreens" title="Show this screen on the Raspberry Pi">
+      <button data-screen="home" disabled>Home</button>
+      <button data-screen="chat" disabled>Chat</button>
+      <button data-screen="music" disabled>Music</button>
+      <button data-screen="tools" disabled>Tools</button>
+      <button data-screen="emotions" disabled title="Plays through all of AIRA's emotions">Emotions</button>
+      <button data-screen="about" disabled>About</button>
+      <button data-screen="system" disabled>System</button>
+    </div>
+  </section>
 
-<div id="log" aria-live="polite"></div>
-
-<div id="meter"><div></div></div>
-<div id="controls">
-  <button id="mic" title="Talk (space)">🎤</button>
-  <div id="textrow">
-    <input id="text" placeholder="Or type to AIRA…" autocomplete="off" enterkeyhint="send">
-    <button id="send">➤</button>
-  </div>
-</div>
-<div id="hint"></div>
+  <section class="talk" aria-label="Conversation">
+    <div id="log" aria-live="polite"></div>
+    <div id="meter" aria-hidden="true"><div></div></div>
+    <div id="controls">
+      <button id="mic" title="Talk (space)" aria-label="Talk">
+        <svg class="i" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></svg></button>
+      <div id="textrow">
+        <input id="text" placeholder="Or type to AIRA…" autocomplete="off" enterkeyhint="send" aria-label="Message">
+        <button id="send" aria-label="Send"><svg class="i" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
+      </div>
+    </div>
+    <div id="hint"></div>
+  </section>
+</main>
 
 <div class="sheet" id="pairSheet">
-  <div class="card">
-    <h2>Pair this browser with AIRA</h2>
-    <div style="color:var(--muted)">Enter the 6-digit code shown in the AIRA server window on the laptop.</div>
-    <input id="code" inputmode="numeric" maxlength="7" placeholder="000000" autocomplete="one-time-code">
-    <input id="devname" placeholder="Name for this device (e.g. Redmi)" maxlength="40" style="width:100%">
+  <div class="card" role="dialog" aria-labelledby="pairTitle">
+    <h2 id="pairTitle">Pair this browser</h2>
+    <p>Enter the 6-digit code shown in the AIRA server window on the laptop.</p>
+    <input id="code" inputmode="numeric" maxlength="7" placeholder="000000" autocomplete="one-time-code" aria-label="Pairing code">
+    <input id="devname" placeholder="Name for this device (e.g. Redmi)" maxlength="40" style="width:100%" aria-label="Device name">
     <div id="pairMsg"></div>
-    <button class="primary" id="pairBtn" style="margin-top:10px">Pair</button>
+    <button class="primary" id="pairBtn" style="margin-top:16px">Pair</button>
   </div>
 </div>
 
 <div class="sheet" id="setSheet">
-  <div class="card">
-    <h2>Settings</h2>
+  <div class="card" role="dialog" aria-labelledby="setTitle">
+    <h2 id="setTitle">Settings</h2>
     <div class="row"><label for="sttSel">Speech recognition</label>
       <select id="sttSel"><option value="auto">Auto</option><option value="server">Server (Whisper)</option><option value="browser">Browser</option></select></div>
     <div class="row"><label for="ttsSel">AIRA's voice</label>
@@ -130,8 +199,8 @@
     <div class="row"><label for="autoStop">Stop recording when I pause</label><input type="checkbox" id="autoStop" checked></div>
     <div class="row"><label for="convo">Keep listening after AIRA replies</label><input type="checkbox" id="convo"></div>
     <div class="row"><label for="rate">Browser voice speed</label><input type="range" id="rate" min="0.8" max="1.6" step="0.05" value="1.1"></div>
-    <div class="row" style="color:var(--muted);font-size:12.5px" id="capsInfo"></div>
-    <div class="row"><button id="forgetBtn">Forget this device</button><button id="closeSet">Done</button></div>
+    <div class="row" id="capsInfo"></div>
+    <div class="row"><button id="forgetBtn">Forget device</button><button id="closeSet">Done</button></div>
   </div>
 </div>
 
@@ -141,14 +210,68 @@
   const $ = id => document.getElementById(id);
   const TOKEN = "aira-web-token", PREFS = "aira-web-prefs";
   const state = { token: localStorage.getItem(TOKEN), caps: { stt: null, tts: null }, session: null,
-                  busy: false, recording: false, abort: null, speakQueue: Promise.resolve(), speakGen: 0, audio: null };
+                  busy: false, recording: false, abort: null, speakQueue: Promise.resolve(), speakGen: 0, audio: null,
+                  ttsFails: 0, voiceUsed: "" };
   const prefs = Object.assign({ stt: "auto", tts: "auto", lang: "auto", autoStop: true, convo: false, rate: 1.1 },
                               JSON.parse(localStorage.getItem(PREFS) || "{}"));
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   // ------------------------------------------------------------------ ui helpers
   function status(text, cls) { $("status").textContent = text; $("dot").className = "dot " + (cls || ""); }
-  function face(s) { $("face").className = s; }
+  // ------------------------------------------------------------------ mascot
+  // Same sprites as the Raspberry Pi screen (served from raspberry_pi/aira_pi/assets/mascot).
+  const STATE_TAG = { idle: "Ready", listening: "Listening", thinking: "Thinking", speaking: "Speaking", error: "Error" };
+  const MOOD_TAG = { happy: "Done!", excited: "Reminder", confused: "Hmm?", sleepy: "Sleepy" };
+  const mascot = { m: null, mood: null, moodUntil: 0, lastActive: performance.now(), nextBlink: performance.now() + 3000, cur: "" };
+  function mood(name, ms) { mascot.mood = name; mascot.moodUntil = performance.now() + ms; }
+  function emotionNow(now) {
+    const s = $("face").className;
+    if (s !== "idle") return s;
+    if (mascot.mood && now < mascot.moodUntil) return mascot.mood;
+    return now - mascot.lastActive > 180000 ? "sleepy" : "idle";
+  }
+  function mascotTick() {
+    const now = performance.now(), m = mascot.m;
+    const name = emotionNow(now), e = m.emotions[name] ? name : "idle", spec = m.emotions[e];
+    let f = spec.frames[Math.floor(now / 1000 * spec.fps) % spec.frames.length];
+    if (spec.blink && spec.blink.length) {                       // a natural blink every few seconds
+      if (now >= mascot.nextBlink + spec.blink.length / 14 * 1000) {
+        mascot.nextBlink = now + 2500 + Math.random() * 3500;
+        if (Math.random() < 0.15) mascot.nextBlink = now + 450;
+      }
+      const k = Math.floor((now - mascot.nextBlink) / 1000 * 14);
+      if (k >= 0 && k < spec.blink.length) f = spec.blink[k];
+    }
+    const src = `/mascot/${e}/${f}`;
+    if (src !== mascot.cur) { $("mascot").src = src; mascot.cur = src; }
+    const tag = $("face").className === "idle" && MOOD_TAG[name] ? MOOD_TAG[name] : STATE_TAG[$("face").className] || "Ready";
+    if ($("stateTag").textContent !== tag) $("stateTag").textContent = tag;
+    setTimeout(mascotTick, 70);
+  }
+  async function loadMascot() {
+    try {
+      const r = await fetch("/mascot/manifest.json");
+      if (!r.ok) return;
+      mascot.m = await r.json();
+      for (const [n, e] of Object.entries(mascot.m.emotions))
+        for (const f of [...e.frames, ...(e.blink || [])]) { const im = new Image(); im.src = `/mascot/${n}/${f}`; }
+      mascotTick();
+    } catch (e) { /* no sprites: the first frame stays */ }
+  }
+  loadMascot();
+
+  let lastReported = null, reportTimer = null;
+  function face(s) {
+    $("face").className = s;
+    mascot.lastActive = performance.now();
+    if (!state.token || s === lastReported) return;
+    clearTimeout(reportTimer);
+    reportTimer = setTimeout(() => {           // tell the laptop so the Raspberry Pi face follows along
+      lastReported = s;
+      api("/api/v1/events/state", { method: "POST", headers: { "Content-Type": "application/json" },
+                                     body: JSON.stringify({ state: s }) }).catch(() => {});
+    }, 120);
+  }
   function hint(t) { $("hint").textContent = t || ""; }
   function bubble(cls, text) {
     const d = document.createElement("div"); d.className = "msg " + cls; d.textContent = text;
@@ -218,7 +341,8 @@
     const s = sttMode(), t = ttsMode();
     $("capsInfo").textContent = `Server: speech recognition ${state.caps.stt || "not installed"}, voice ${state.caps.tts || "not configured"}.`;
     hint(s === "none" ? "This browser can't do speech recognition and the server has none: type instead."
-                      : `Listening via ${s === "server" ? "Whisper on the laptop" : "this browser"} · voice: ${t === "server" ? state.caps.tts + " on the laptop" : t}`);
+                      : `Listening via ${s === "server" ? "Whisper on the laptop" : "this browser"} · voice: ${
+                          state.voiceUsed || (t === "server" ? state.caps.tts + " on the laptop" : t)}${girl() ? " (girl)" : ""}`);
     $("mic").disabled = s === "none";
   }
 
@@ -233,7 +357,86 @@
       const st = await (await api("/api/v1/status")).json();
       status(st.status === "ok" ? `ready · ${st.config.model}` : "AI model not ready — check the server window", st.status === "ok" ? "ok" : "warn");
     } catch (e) { if (e.message !== "not paired") status("cannot reach AIRA server", "bad"); return; }
-    describeModes(); face("idle");
+    describeModes(); face("idle"); listenEvents(); watchPi();
+  }
+
+  // ------------------------------------------------------------------ live events (reminders, Pi button)
+  let eventsCtrl = null;
+  async function listenEvents() {
+    if (eventsCtrl) return;
+    eventsCtrl = new AbortController();
+    for (let delay = 1000; ; delay = Math.min(delay * 2, 30000)) {
+      try {
+        const r = await api("/api/v1/events", { signal: eventsCtrl.signal });
+        if (!r.ok) throw new Error(r.status);
+        delay = 1000;
+        const reader = r.body.getReader(), dec = new TextDecoder(); let raw = "";
+        for (;;) {
+          const { value, done } = await reader.read(); if (done) break;
+          raw += dec.decode(value, { stream: true });
+          let i;
+          while ((i = raw.indexOf("\n\n")) >= 0) {
+            const block = raw.slice(0, i); raw = raw.slice(i + 2);
+            const m = block.match(/^data: (.*)$/m); if (!m) continue;
+            onEvent(JSON.parse(m[1]));
+          }
+        }
+      } catch (e) { if (e.name === "AbortError" || e.message === "not paired") return; }
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+  // ------------------------------------------------------------------ AIRA's Raspberry Pi screen
+  let piTimer = null;
+  async function watchPi() {
+    clearTimeout(piTimer);
+    try {
+      const r = await api("/api/v1/devices");
+      const list = r.ok ? (await r.json()).devices || [] : [];
+      const on = list.length > 0, tag = $("piTag");
+      tag.classList.toggle("on", on);
+      const narrow = matchMedia("(max-width: 600px)").matches;
+      // "AIRA Half": the Pi is only a screen (talk on this page); "AIRA Full": the complete handset
+      const edition = on ? ((list[0].caps || {}).edition || "") : "";
+      const short = edition.replace(/^AIRA\s+/i, "");
+      tag.textContent = on ? (edition ? (narrow ? `${short} on` : `${edition} · on`) : (narrow ? "Pi on" : "Pi screen on"))
+                           : (narrow ? "Pi off" : "Pi screen off");
+      tag.title = on ? `${edition || "AIRA's screen"} connected: ${list.map(d => d.name).join(", ")}` +
+                       (/half/i.test(edition) ? " (screen only: you talk to AIRA on this page)" : "")
+                     : "AIRA's Raspberry Pi screen is not connected";
+      document.querySelectorAll("#piScreens button").forEach(b => b.disabled = !on);
+    } catch (e) { if (e.message === "not paired") return; }
+    piTimer = setTimeout(watchPi, document.hidden ? 30000 : 8000);
+  }
+  document.querySelectorAll("#piScreens button").forEach(b => b.onclick = async () => {
+    try {
+      const r = await api("/api/v1/devices/screen", { method: "POST", headers: { "Content-Type": "application/json" },
+                                                       body: JSON.stringify({ screen: b.dataset.screen }) });
+      if (!r.ok) throw new Error(r.status);
+      document.querySelectorAll("#piScreens button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+      hint(b.dataset.screen === "emotions" ? "AIRA's screen plays through her emotions, 3 seconds each (Home after a minute)"
+                                           : `AIRA's screen shows ${b.textContent} (back to Home after a minute)`);
+    } catch (e) { if (e.message !== "not paired") hint("Could not reach AIRA's screen"); }
+  });
+
+  function onEvent(ev) {
+    if (ev.type === "caption" && ev.source && ev.source !== "web") {
+      // a conversation started on the Pi's touch screen: show it here and speak the answer, as the Pi has no speaker
+      if (ev.role === "user") { meta(bubble("user", ev.text), "on " + ev.source); face("thinking"); status("thinking…", "warn"); }
+      else {
+        bubble("aira", ev.text);
+        speak(ev.text, state.speakGen);
+        state.speakQueue.then(() => { if (!state.recording) { face("idle"); status("ready", "ok"); } });
+      }
+      return;
+    }
+    if (ev.type === "reminder") {
+      const b = bubble("reminder", ev.say || ev.text); b.setAttribute("role", "alert"); mood("excited", 6000);
+      stopAll(); speak(ev.say || ev.text, state.speakGen);
+      state.speakQueue.then(() => face("idle"));
+    } else if (ev.type === "wake" && !state.recording && sttMode() !== "none") {
+      note("AIRA's button was pressed — listening");
+      $("mic").click();
+    }
   }
 
   // ------------------------------------------------------------------ recording (server STT)
@@ -281,7 +484,7 @@
       const r = await api("/api/v1/voice/transcribe", { method: "POST", body: fd });
       const j = await r.json();
       if (!r.ok) { note("Speech recognition failed: " + (j.detail || r.status)); face("error"); status("ready", "ok"); return; }
-      if (!j.text.trim()) { note("Didn't catch that."); face("idle"); status("ready", "ok"); return; }
+      if (!j.text.trim()) { note("Didn't catch that."); mood("confused", 3000); face("idle"); status("ready", "ok"); return; }
       await converse(j.text, `heard in ${j.latency_s}s${j.language ? " · " + j.language : ""}`);
     } catch (e) { if (e.message !== "not paired") { note("Upload failed: " + e.message); face("error"); } }
   }
@@ -329,6 +532,7 @@
   });
 
   // ------------------------------------------------------------------ conversation
+  document.querySelectorAll("#quick button").forEach(b => b.onclick = () => { stopAll(); converse(b.dataset.say); });
   $("send").onclick = () => { const t = $("text").value.trim(); if (t) { $("text").value = ""; stopAll(); converse(t); } };
   $("text").addEventListener("keydown", e => { if (e.key === "Enter") $("send").click(); });
 
@@ -336,11 +540,17 @@
   async function converse(text, how) {
     const u = bubble("user", text); if (how) meta(u, how);
     const a = bubble("aira", ""); face("thinking"); status("thinking…", "warn");
+    const at = document.createElement("span"); a.appendChild(at);   // text; chips/buttons go after it
     const ctrl = new AbortController(); state.abort = ctrl; const gen = ++state.speakGen;
-    let buffer = "", full = "", stats = null;
+    let buffer = "", full = "", stats = null, spokeAny = false;
     const flushSentences = (final) => {
       let m;
-      while ((m = SENT.exec(buffer))) { const s = buffer.slice(0, m.index + m[1].length).trim(); buffer = buffer.slice(m.index + m[0].length); if (s) speak(s, gen); }
+      while ((m = SENT.exec(buffer))) { const s = buffer.slice(0, m.index + m[1].length).trim(); buffer = buffer.slice(m.index + m[0].length); if (s) { speak(s, gen); spokeAny = true; } }
+      // Start talking sooner: speak the first clause as soon as it ends with a comma (not before 15 characters).
+      if (!spokeAny && !final && buffer.length > 18) {
+        const c = buffer.indexOf(", ", 15);
+        if (c > 0) { speak(buffer.slice(0, c + 1).trim(), gen); buffer = buffer.slice(c + 2); spokeAny = true; }
+      }
       if (final && buffer.trim()) { speak(buffer.trim(), gen); buffer = ""; }
     };
     try {
@@ -356,18 +566,22 @@
           const block = raw.slice(0, i); raw = raw.slice(i + 2);
           const ev = (block.match(/^event: (.*)$/m) || [])[1], data = JSON.parse((block.match(/^data: (.*)$/m) || [, "{}"])[1]);
           if (ev === "start") state.session = data.session_id;
-          else if (ev === "token") { full += data.text; buffer += data.text; a.textContent = full; $("log").scrollTop = $("log").scrollHeight; flushSentences(false); }
+          else if (ev === "token") { full += data.text; buffer += data.text; at.textContent = full; $("log").scrollTop = $("log").scrollHeight; flushSentences(false); }
+          else if (ev === "tool") { chip(a, data); if (data.ok) mood("happy", 4000); }
+          else if (ev === "confirm") confirmButtons(a);
           else if (ev === "done") stats = data.stats;
           else if (ev === "error") throw new Error(data.message + (data.hint ? " — " + data.hint : ""));
         }
       }
       flushSentences(true);
-      if (stats) meta(a, `${stats.ttft_s != null ? "first word " + stats.ttft_s.toFixed(2) + "s · " : ""}${stats.tokens_per_s} tok/s`);
+      if (stats) meta(a, stats.model && stats.model.startsWith("aira-")
+        ? `done in ${(stats.client_total_s || 0).toFixed(2)}s${stats.model === "aira-fast" ? " · instant command" : ""}`
+        : `${stats.ttft_s != null ? "first word " + stats.ttft_s.toFixed(2) + "s · " : ""}${stats.tokens_per_s} tok/s`);
       status("ready", "ok");
     } catch (e) {
       if (e.name === "AbortError") { meta(a, "(interrupted)"); return; }
       if (e.message === "not paired") return;
-      a.textContent = full || "⚠ " + e.message; face("error"); status("error", "bad"); return;
+      at.textContent = full || "Error: " + e.message; face("error"); status("error", "bad"); return;
     } finally { state.abort = null; }
     state.speakQueue.then(() => {
       if (gen !== state.speakGen) return;
@@ -376,17 +590,47 @@
     });
   }
 
+  const TOOL_LABEL = { open_app: "opened app", close_app: "closed app", open_website: "opened website",
+    web_search: "web search", system_status: "laptop status", get_datetime: "clock", media_control: "media",
+    volume: "volume", brightness: "brightness", set_timer: "timer", set_reminder: "reminder",
+    list_reminders: "reminders", cancel_reminder: "cancelled", lock_screen: "locked", power: "power",
+    cancel_shutdown: "shutdown cancelled" };
+  function chip(el, d) {
+    const c = document.createElement("span"); c.className = "chip" + (d.ok ? "" : " fail");
+    c.textContent = (TOOL_LABEL[d.name] || d.name) + (d.ok ? "" : " failed") + (d.fast ? " · instant" : "");
+    c.title = d.say || ""; el.appendChild(c);
+  }
+  function confirmButtons(el) {
+    const row = document.createElement("div"); row.className = "confirm";
+    const yes = document.createElement("button"); yes.className = "yes"; yes.textContent = "Yes, do it";
+    const no = document.createElement("button"); no.textContent = "Cancel";
+    const answer = word => { row.remove(); stopAll(); converse(word); };
+    yes.onclick = () => answer("yes"); no.onclick = () => answer("no");
+    row.append(yes, no); el.appendChild(row);
+  }
+
   // ------------------------------------------------------------------ speech output
   function speak(sentence, gen) {
     const mode = ttsMode();
     if (mode === "off") return;
-    if (mode === "server") {
+    // Girl style: a browser voice is only used if it is a girl / woman voice for this language;
+    // otherwise (e.g. Chrome has only a male Tamil voice) this sentence uses the laptop's girl voice.
+    const server = mode === "server" || (girl() && state.caps.tts && !pickVoice(sentence));
+    if (server) {
       const audioP = api("/api/v1/voice/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: sentence }) })
         .then(r => r.ok ? r.blob() : Promise.reject(new Error("tts " + r.status))).catch(e => e);  // fetch starts now, plays in order
       state.speakQueue = state.speakQueue.then(async () => {
         if (gen !== state.speakGen) return;
         const blob = await audioP;
-        if (blob instanceof Error) { state.caps.tts = null; note("Server voice failed; using the browser voice."); return browserSay(sentence, gen); }
+        if (blob instanceof Error) {                     // this sentence in the browser; give up on the server after 3 in a row
+          if (++state.ttsFails >= 3 && state.caps.tts) {
+            state.caps.tts = null; describeModes();
+            note("The laptop voice keeps failing; using the browser voice. Check the server window.");
+          }
+          return browserSay(sentence, gen);
+        }
+        state.ttsFails = 0;
+        if (state.voiceUsed !== "") { state.voiceUsed = ""; describeModes(); }
         return playBlob(blob, gen);
       });
     } else state.speakQueue = state.speakQueue.then(() => browserSay(sentence, gen));
@@ -395,23 +639,41 @@
     return new Promise(res => {
       if (gen !== state.speakGen) return res();
       const url = URL.createObjectURL(blob), au = new Audio(url); state.audio = au;
-      au.onplay = () => { face("speaking"); status("speaking… (tap 🎤 to interrupt)", "ok"); };
+      au.onplay = () => { face("speaking"); status("speaking… (tap the mic to interrupt)", "ok"); };
       const end = () => { URL.revokeObjectURL(url); if (state.audio === au) state.audio = null; res(); };
       au.onended = end; au.onerror = end; au.play().catch(end);
     });
   }
+  const girl = () => state.caps.voice_style === "girl";
+  // Windows / Chrome / Edge / Android voice names. Male ones are never used for AIRA's girl voice.
+  const CHILD = /\bAna\b|child|kid|girl/i;
+  const FEMALE = /\b(Ana|Aria|Jenny|Zira|Heera|Neerja|Pallavi|Swara|Kalpana|Shruti|Sara|Michelle|Emma|Ava|Libby|Sonia|Maisie|Natasha|Clara|Samantha|Karen|Moira|Tessa|Veena|Lekha|Kanya|Female|Woman)\b/i;
+  const MALE = /\b(David|Mark|Ravi|Valluvar|Guy|Prabhat|Madhur|Daniel|Alex|Fred|Rishi|George|James|Ryan|Eric|Christopher|Roger|Steffan|Thomas|Brian|Andrew|Male|Man)\b/i;
   function pickVoice(text) {
+    if (!("speechSynthesis" in window)) return null;
     const voices = speechSynthesis.getVoices(), ta = hasTamil(text);
-    return (ta ? voices.find(v => v.lang.startsWith("ta")) : null)
-        || voices.find(v => v.lang === "en-IN") || voices.find(v => v.lang.startsWith("en")) || null;
+    const forLang = voices.filter(v => v.lang.replace("_", "-").startsWith(ta ? "ta" : "en"));
+    if (girl()) {
+      const child = !ta && forLang.find(v => CHILD.test(v.name) && !MALE.test(v.name));
+      if (child) return child;                        // Edge: "Microsoft Ana Online (Natural)", a real child voice
+      const rank = v => (v.lang.endsWith("IN") ? 0 : 2) + (/Natural|Online|Google/i.test(v.name) ? 0 : 1);
+      return forLang.filter(v => FEMALE.test(v.name) && !MALE.test(v.name)).sort((a, b) => rank(a) - rank(b))[0] || null;
+    }
+    return (ta ? forLang[0] : null) || voices.find(v => v.lang === "en-IN") || forLang[0] || null;
   }
   function browserSay(text, gen) {
     return new Promise(res => {
       if (gen !== state.speakGen || !("speechSynthesis" in window)) return res();
       const u = new SpeechSynthesisUtterance(text);
       const v = pickVoice(text); if (v) { u.voice = v; u.lang = v.lang; } else u.lang = hasTamil(text) ? "ta-IN" : "en-IN";
-      u.rate = prefs.rate; u.pitch = 1.15;
-      u.onstart = () => { face("speaking"); status("speaking… (tap 🎤 to interrupt)", "ok"); };
+      const childVoice = v && CHILD.test(v.name);
+      // no girl voice here at all: the browser default may be a man's voice, so lift it as far as it goes
+      u.rate = prefs.rate; u.pitch = girl() ? (childVoice ? 1.2 : v ? 1.6 : 2) : 1.15;
+      u.onstart = () => {
+        face("speaking"); status("speaking… (tap the mic to interrupt)", "ok");
+        const name = "browser: " + (v ? v.name.replace(/^Microsoft |\s*\(.*\)| - .*$/g, "") : "default");
+        if (state.voiceUsed !== name) { state.voiceUsed = name; describeModes(); }
+      };
       u.onend = res; u.onerror = res;
       speechSynthesis.speak(u);
     });

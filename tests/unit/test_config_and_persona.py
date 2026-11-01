@@ -58,3 +58,13 @@ def test_custom_persona_file(tmp_path):
     f.write_text("You are AIRA. Today is {today}. JSON example: {not_a_key}", encoding="utf-8")
     p = build_system_prompt(persona_file=f)
     assert p.startswith("You are AIRA.")  # unknown placeholder -> used verbatim, no crash
+
+
+def test_think_is_off_by_default_and_accepts_default_word(monkeypatch):
+    monkeypatch.delenv("AIRA_LLM_THINK", raising=False)
+    assert Settings(_env_file=None).llm_think is False
+    for word in ("default", "", "None"):
+        monkeypatch.setenv("AIRA_LLM_THINK", word)
+        assert Settings(_env_file=None).llm_think is None
+    monkeypatch.setenv("AIRA_LLM_THINK", "true")
+    assert Settings(_env_file=None).llm_think is True

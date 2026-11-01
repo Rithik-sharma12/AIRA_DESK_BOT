@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIRA on the Pi</title>
+<style>
+  :root { --teal:#00C2CB; --magenta:#FF00FF; --yellow:#FFD700; --paper:#F5F5DC; --white:#fff; --muted:#555;
+          --line:3px solid #000; --font: system-ui, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Tamil", sans-serif; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); font:16px/1.4 var(--font); color:#000; }
+  main { max-width:640px; margin:0 auto; padding:16px; min-height:100vh; display:flex; flex-direction:column; gap:12px; }
+  header { display:flex; align-items:center; gap:10px; border-bottom:var(--line); padding-bottom:10px; }
+  .logo { font:900 30px/1 var(--font); letter-spacing:-.02em; }
+  .tag { font:800 11px/1 var(--font); text-transform:uppercase; letter-spacing:.06em; border:2px solid #000;
+         border-radius:4px; padding:5px 7px; background:var(--white); }
+  #log { flex:1; display:flex; flex-direction:column; gap:12px; overflow:auto; }
+  .msg { border:var(--line); border-radius:4px; padding:10px 12px; box-shadow:4px 4px 0 #000; max-width:88%; white-space:pre-wrap; }
+  .msg b { display:block; font:800 11px/1 var(--font); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+  .user { align-self:flex-end; background:var(--yellow); }
+  .aira { align-self:flex-start; background:var(--white); }
+  .err  { align-self:stretch; background:var(--magenta); }
+  .meta { display:block; font:700 11px/1 var(--font); color:var(--muted); text-transform:uppercase; margin-top:6px; }
+  form { display:flex; gap:10px; }
+  input { flex:1; min-width:0; min-height:48px; border:var(--line); border-radius:4px; padding:0 12px; font:16px var(--font); }
+  button { min-height:48px; min-width:48px; border:var(--line); border-radius:4px; background:var(--teal); font:800 14px var(--font);
+           text-transform:uppercase; box-shadow:4px 4px 0 #000; cursor:pointer; }
+  button:active { transform:translate(4px,4px); box-shadow:none; }
+  input:focus-visible, button:focus-visible { outline:3px solid var(--magenta); outline-offset:2px; }
+  #hint { font:700 12px/1.3 var(--font); color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  label.speak { display:flex; gap:8px; align-items:center; font:700 13px var(--font); }
+</style>
+</head>
+<body>
+<main>
+  <header><span class="logo">AIRA</span><span class="tag" id="state">Pi chat</span>
+    <label class="speak" style="margin-left:auto"><input type="checkbox" id="speak" checked> Voice</label></header>
+  <div id="log" aria-live="polite"></div>
+  <form id="f" autocomplete="off">
+    <input id="text" placeholder="Type to AIRA…" enterkeyhint="send" aria-label="Message">
+    <button aria-label="Send">Send</button>
+  </form>
+  <div id="hint">Answers show on AIRA's screen too.</div>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const KEY = "aira-pi-code";
+  let code = localStorage.getItem(KEY) || "";
+  function bubble(cls, who, text, meta) {
+    const d = document.createElement("div"); d.className = "msg " + cls;
+    const b = document.createElement("b"); b.textContent = who; d.appendChild(b);
+    d.appendChild(document.createTextNode(text));
+    if (meta) { const m = document.createElement("span"); m.className = "meta"; m.textContent = meta; d.appendChild(m); }
+    $("log").appendChild(d); $("log").scrollTop = $("log").scrollHeight;
+  }
+  // AIRA's voice: a girl or woman voice only (never Windows David / Ravi / Valluvar)
+  const CHILD = /\bAna\b|child|kid|girl/i;
+  const FEMALE = /\b(Ana|Aria|Jenny|Zira|Heera|Neerja|Pallavi|Swara|Sara|Michelle|Emma|Ava|Libby|Sonia|Samantha|Karen|Veena|Lekha|Female|Woman)\b/i;
+  const MALE = /\b(David|Mark|Ravi|Valluvar|Guy|Prabhat|Madhur|Daniel|Alex|Fred|Rishi|George|James|Male|Man)\b/i;
+  function say(text) {
+    if (!$("speak").checked || !("speechSynthesis" in window)) return;
+    const ta = /[஀-௿]/.test(text);
+    const vs = speechSynthesis.getVoices().filter(v => v.lang.replace("_", "-").startsWith(ta ? "ta" : "en"));
+    const v = (!ta && vs.find(x => CHILD.test(x.name))) || vs.find(x => FEMALE.test(x.name) && !MALE.test(x.name));
+    const u = new SpeechSynthesisUtterance(text);
+    if (v) { u.voice = v; u.lang = v.lang; } else u.lang = ta ? "ta-IN" : "en-IN";
+    u.pitch = v && CHILD.test(v.name) ? 1.2 : v ? 1.5 : 2;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }
+  async function post(body) {
+    const r = await fetch("/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    return [r.status, await r.json().catch(() => ({}))];
+  }
+  async function askCode() {
+    for (;;) {
+      const c = (prompt("AIRA's 6-digit code (on her System screen):") || "").replace(/\D/g, "");
+      if (!c) return false;
+      const [s, j] = await post({ code: c, text: "" });
+      if (s === 200) { code = c; localStorage.setItem(KEY, c); return true; }
+      alert(j.error || "Wrong code");
+      if (s === 429) return false;
+    }
+  }
+  $("f").onsubmit = async e => {
+    e.preventDefault();
+    const text = $("text").value.trim(); if (!text) return;
+    if (!code && !(await askCode())) return;
+    $("text").value = ""; bubble("user", "You", text);
+    $("state").textContent = "Thinking…"; $("state").style.background = "var(--yellow)";
+    try {
+      let [s, j] = await post({ code, text });
+      if (s === 401) { localStorage.removeItem(KEY); code = ""; if (await askCode()) [s, j] = await post({ code, text }); }
+      if (s === 200 && j.reply !== undefined) {
+        bubble("aira", "AIRA", j.reply, j.via === "online" ? "online AI" : "via the laptop"); say(j.reply);
+      } else bubble("err", "Notice", j.error || "Something went wrong");
+    } catch (err) { bubble("err", "Notice", "Cannot reach AIRA's Pi"); }
+    $("state").textContent = "Pi chat"; $("state").style.background = "";
+  };
+  if ("speechSynthesis" in window) speechSynthesis.getVoices();
+  bubble("aira", "AIRA", "Hi! Type to me here. I answer on my screen and in this browser.");
+})();
+</script>
+</body>
+</html>

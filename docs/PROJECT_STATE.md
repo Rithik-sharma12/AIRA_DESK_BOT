@@ -1,6 +1,9 @@
 # AIRA — current project state
 
-Last updated: 31 Oct 2026, from the hardware handover. **Verified** means seen on the live
+Last updated: 1 Nov 2026. **Current build: AIRA Half** (laptop + Pi screen only; you talk on the
+web page). **AIRA Full** is the complete handset with microphone, speaker and battery.
+First real link on 1 Nov: the Pi paired over HTTPS and showed AIRA following web conversations.
+From the hardware handover (31 Oct): **Verified** means seen on the live
 device. Everything else is **planned** until a real test confirms it. No passwords, keys
 or IP addresses belong in this file.
 
@@ -15,7 +18,7 @@ or IP addresses belong in this file.
 | Storage | SanDisk Ultra 64 GB microSD: FAT32 `bootfs` (mounted at `/boot/firmware`), ext4 `rootfs` |
 | Swap | ~415 MiB |
 | Boot config | `arm_64bit=1`, `dtparam=audio=on`, `dtoverlay=tft35a:rotate=90`; `vc4-kms-v3d` commented out (31 Oct); regulatory domain `IN` |
-| Display | **Working (31 Oct 2026):** 3.5" ILI9486 (panel HSD035577C3) as `/dev/fb1`, Linux console on VT1 via `aira-tft-console.service`; touch (ADS7846) detected. Details: [`journal/2026-10-31-display-setup.md`](journal/2026-10-31-display-setup.md) |
+| Display | **Working (31 Oct 2026):** 3.5" ILI9486 (panel HSD035577C3) as `/dev/fb1`, Linux console on VT1 via `aira-tft-console.service`; touch (ADS7846) detected. **1 Nov:** AIRA's face service runs and shows the mascot interface on the TFT. Touch sends **nothing**: 0 events and 0 interrupts while pressing; GPIO17 (pen IRQ) reads `lo` all the time, also with the Pi's pull-up on (`gpio=17=ip,pu` added under the `tft35a` line, backup made). Reading the chip directly over SPI (`touch_spi.sh test`) returns **all zeros** for X, Y, Z1 and Z2 at 2 MHz, 500, 100 and 50 kHz, pressed or not; SPI0 pins verified correct (GPIO9 = SPI0_MISO, 10 = MOSI, 11 = SCLK, `pinctrl`). **Conclusion: the XPT2046 touch controller does not respond (hardware): no power to the chip, header pin 26 (touch CS) not making contact, or a faulty chip/board.** SPI reader switched back off (`touch_spi.sh disable`). Next: inspect / reseat header pins 11, 17, 21, 26; measure 3.3 V on XPT2046 pin 1; else replace the screen (same overlay, no software change). AIRA runs without touch (web page controls). Details: [`journal/2026-10-31-display-setup.md`](journal/2026-10-31-display-setup.md) |
 | Network | NetworkManager on `wlan0`; a profile for the phone hotspot exists (root:root, 0600). IP is DHCP and changes |
 | SSH | `openssh-server` installed and enabled at boot (reachability still to test) |
 | Remote access | Raspberry Pi Connect started, account signed in |
@@ -30,7 +33,9 @@ Several of these details were captured once and could have changed since.
 | HP Omen 16, Ryzen 7, RTX 4060 8 GB, 16 GB RAM, Windows 11 | Verified (owner) |
 | Ollama installed; models seen earlier: `qwen3:4b`, `qwen2.5-coder:7b` | Verified earlier |
 | Gemma 4 model pulled | **To verify** (repo default `gemma4:e4b-it-qat`) |
-| AIRA server (this repo) running on port 8765 | **To verify**; it binds to 127.0.0.1 until the Pi link is set up |
+| AIRA server (this repo) running on port 8765 | **Verified 31 Oct**: web UI paired and chatting (was slow with `gemma4:12b` + thinking on; fixed by `AIRA_LLM_THINK=false`, model choice in HOW-TO-RUN 2b) |
+| Task automation (apps, status, media, timers, power) | Built and tested with a dry-run backend; **to verify on Windows** |
+| Offline voices (Piper Tamil + English) | Download script ready; **to verify on the laptop** |
 
 ## Requirements from the owner
 
@@ -68,11 +73,12 @@ These steps sit inside roadmap phases 5 (Raspberry Pi) and 6 (device link). Each
 | 1 | Baseline: `bash raspberry_pi/collect_baseline.sh` on AIRA | Report saved; SPI/I²S/overlay availability known |
 | 2 | Network + SSH: Pi and laptop on the same hotspot, `ssh aira@AIRA.local` from Windows | Laptop and Pi can reach each other both ways |
 | 2b | Optional: phone as Wi-Fi keyboard (`raspberry_pi/wifi_keyboard`) for typing on the TFT console | Paired phone types into the console; Ctrl/arrows/F-keys work |
-| 3 | Display, then touch | ✅ console on the TFT (31 Oct). Touch detected; check events with `evtest` when a touch UI is needed |
-| 4 | Audio, one module at a time: DAC → amplifier + speakers → microphone → full duplex | Each test in `docs/HARDWARE.md` §6 passes |
+| 3 | Display, then touch | ✅ console on the TFT (31 Oct). Touch menu built (Home / Chat / Music / Tools / Emotions / About / System) and showing on the Pi (1 Nov); also driven by the web page and, planned, an ESP32 joystick. Touch controller not responding: hardware fault suspected (see Display); calibrate after the fix or a replacement screen |
+| 4 | Audio, one module at a time: DAC → amplifier + speakers → microphone → full duplex (`raspberry_pi/setup_audio.sh`) | Each test in `docs/HARDWARE.md` §6 passes; `setup_audio.sh --test` plays and records |
 | 5 | Button | `check_hardware.py` detects presses |
+| 5b | Wireless joystick: ESP32 WROOM + KY-023 (`esp32_joystick/`; firmware compiles for ESP32, not yet run on hardware) | Serial Monitor shows directions (stage 1); `python3 -m aira_pi joystick` moves the Pi's focus (stage 2); the ESP32 pairs and drives the menu (stage 3) |
 | 6 | Power: test cells, then charger + boost on the bench | Voltage, ripple, temperature and charge-while-running validated under real load |
-| 7 | AI client on the Pi talking to the laptop server | Pi gets a reply from the laptop over Wi-Fi with timeouts and offline handling |
+| 7 | AI client on the Pi talking to the laptop server (`raspberry_pi/aira_pi`, built; not yet run on the Pi) | `python3 -m aira_pi pair` succeeds; face shows "linked" and mirrors a laptop conversation; reconnects after the laptop restarts |
 | 8 | Enclosure | Measured parts fit with airflow, mic-speaker separation and USB-C/microSD access |
 
 ## Open questions

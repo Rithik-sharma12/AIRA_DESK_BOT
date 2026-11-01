@@ -1,6 +1,8 @@
 """Web voice interface: the page itself, browser pairing, and speech endpoints.
 
 GET  /                         the web UI (public; it asks for pairing before doing anything)
+GET  /mascot/manifest.json     AIRA's mascot sprites (public, shared with the Raspberry Pi)
+GET  /mascot/{emotion}/{frame}
 POST /api/v1/web/hello         shows the pairing code in the server console
 POST /api/v1/web/pair          {code, name} -> {token}
 GET  /api/v1/voice/capabilities  which speech engines run on the server        (auth)
@@ -10,18 +12,24 @@ POST /api/v1/voice/speak         {text} -> audio/wav                            
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..voice.service import VoiceUnavailable
 
 log = logging.getLogger("aira.web")
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
+# One set of sprites for the web page and the Pi screen (raspberry_pi/aira_pi/assets/mascot).
+MASCOT_DIR = Path(__file__).resolve().parents[2] / "raspberry_pi" / "aira_pi" / "assets" / "mascot"
+_NAME = re.compile(r"^[a-z][a-z0-9_]{0,30}$")
+_FRAME = re.compile(r"^[a-z0-9_]{1,40}\.png$")
 SUFFIX = {"audio/webm": ".webm", "audio/ogg": ".ogg", "audio/mp4": ".m4a", "audio/mpeg": ".mp3",
           "audio/wav": ".wav", "audio/x-wav": ".wav", "audio/wave": ".wav"}
 
@@ -47,6 +55,24 @@ def build_web_router(require_api_key) -> APIRouter:
             raise HTTPException(404, "web UI disabled (AIRA_WEB_UI_ENABLED=false)")
         return HTMLResponse((WEB_DIR / "index.html").read_text(encoding="utf-8"),
                             headers={"Cache-Control": "no-store"})
+
+    @public.get("/mascot/manifest.json", include_in_schema=False)
+    async def mascot_manifest() -> Response:
+        path = MASCOT_DIR / "manifest.json"
+        if not path.exists():
+            raise HTTPException(404, "no mascot sprites")
+        return Response(json.dumps(json.loads(path.read_text(encoding="utf-8"))), media_type="application/json",
+                        headers={"Cache-Control": "no-cache"})
+
+    @public.get("/mascot/{emotion}/{frame}", include_in_schema=False)
+    async def mascot_frame(emotion: str, frame: str) -> FileResponse:
+        # Strict names: only files inside the mascot folder can ever be served.
+        if not _NAME.match(emotion) or not _FRAME.match(frame):
+            raise HTTPException(404, "not found")
+        path = MASCOT_DIR / emotion / frame
+        if not path.is_file():
+            raise HTTPException(404, "not found")
+        return FileResponse(path, media_type="image/png", headers={"Cache-Control": "max-age=3600"})
 
     @public.post("/api/v1/web/hello")
     async def hello(request: Request) -> dict:

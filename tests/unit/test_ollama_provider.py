@@ -129,3 +129,75 @@ def test_health_unreachable():
 
     h = run(make(handler).health())
     assert h.reachable is False and "not reachable" in h.detail
+
+
+def test_loopback_urls_bypass_system_proxy():
+    from laptop_server.llm.ollama_provider import OllamaProvider, is_loopback_url
+
+    assert is_loopback_url("http://127.0.0.1:11434")
+    assert is_loopback_url("http://localhost:11434/")
+    assert is_loopback_url("http://[::1]:11434")
+    assert not is_loopback_url("http://192.168.1.20:11434")
+    p = OllamaProvider(base_url="http://127.0.0.1:11434", model="m")
+    assert p._client._trust_env is False
+
+
+def test_think_flag_rejected_is_retried_without_it():
+    bodies = []
+
+    def handler(req: httpx.Request):
+        body = json.loads(req.content)
+        bodies.append(body)
+        if "think" in body:
+            return httpx.Response(400, json={"error": '"llama3.1:8b" does not support thinking'})
+        return httpx.Response(200, content=ndjson(
+            {"message": {"content": "Hello"}, "done": False},
+            {"message": {"content": ""}, "done": True, "done_reason": "stop"},
+        ))
+
+    p = make(handler, think=False)
+    chunks = run(collect(p, [{"role": "user", "content": "hi"}]))
+    assert "".join(c.text for c in chunks) == "Hello"
+    assert len(bodies) == 2 and "think" in bodies[0] and "think" not in bodies[1]
+    assert p.think is None  # remembered for later turns
+    run(collect(p, [{"role": "user", "content": "again"}]))
+    assert len(bodies) == 3
+
+
+def test_reply_that_is_all_thinking_gets_a_spoken_fallback():
+    from laptop_server.llm.ollama_provider import EMPTY_REPLY_FALLBACK
+
+    p = make(lambda r: httpx.Response(200, content=ndjson(
+        {"message": {"content": "", "thinking": "Let me consider... " * 50}, "done": False},
+        {"message": {"content": ""}, "done": True, "done_reason": "length", "eval_count": 400},
+    )))
+    chunks = run(collect(p, [{"role": "user", "content": "hi"}]))
+    assert chunks[-1].done and chunks[-1].text == EMPTY_REPLY_FALLBACK
+    assert chunks[-1].stats.done_reason == "length"
+
+
+def test_tools_are_sent_and_tool_calls_parsed():
+    seen = {}
+
+    def handler(req: httpx.Request):
+        seen["body"] = json.loads(req.content)
+        return httpx.Response(200, content=ndjson(
+            {"message": {"role": "assistant", "content": "",
+                         "tool_calls": [{"function": {"name": "open_app", "arguments": {"name": "chrome"}}},
+                                        {"function": {"name": "volume", "arguments": '{"action": "up"}'}},
+                                        {"function": {"arguments": {}}}]}, "done": False},
+            {"message": {"content": ""}, "done": True, "done_reason": "stop"},
+        ))
+
+    tools = [{"type": "function", "function": {"name": "open_app", "parameters": {"type": "object"}}}]
+    p = make(handler, think=False)
+    chunks = run(collect_tools(p, [{"role": "user", "content": "open chrome"}], tools))
+    assert seen["body"]["tools"] == tools and seen["body"]["think"] is False
+    calls = [c for ch in chunks for c in ch.tool_calls]
+    assert [(c.name, c.arguments) for c in calls] == [("open_app", {"name": "chrome"}), ("volume", {"action": "up"})]
+    # a tool-call-only reply is not "empty": no fallback sentence
+    assert "".join(c.text for c in chunks) == ""
+
+
+async def collect_tools(p, msgs, tools):
+    return [c async for c in p.stream_chat(msgs, tools=tools)]

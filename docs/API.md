@@ -38,12 +38,25 @@ Same request; response is `text/event-stream`:
 ```
 event: start   data: {"session_id": "..."}
 event: token   data: {"text": "இன்னைக்கு"}          (repeated)
+event: tool    data: {"name": "open_app", "ok": true, "say": "Opening Chrome.", "fast": true}
+event: confirm data: {"tool": "power", "prompt": "Do you want me to shut down the laptop? Say yes to confirm."}
 event: done    data: {"session_id": "...", "reply": "...", "stats": {...}}
 event: error   data: {"code": "llm_unavailable", "message": "...", "hint": "..."}
 ```
 
 Phase 4 (voice) consumes this stream sentence by sentence so TTS starts before the
-reply is finished.
+reply is finished. `tool` appears when AIRA used a laptop skill (task automation);
+`confirm` means AIRA is waiting for "yes"/"no" in the next message before a risky action.
+Instant commands report `stats.model = "aira-fast"`.
+
+### Live events and devices
+| Method | Path | |
+|---|---|---|
+| GET | `/events` | SSE stream of hub events: `state`, `caption` (with `source`: `web` or the device name), `reminder`, `confirm`, `wake`, `screen` |
+| POST | `/events/state` | `{"state": "listening"\|"thinking"\|"speaking"\|"idle"\|"error"}` from the web page |
+| GET | `/devices` | connected Raspberry Pi devices |
+| POST | `/devices/screen` | `{"screen": "home"\|"chat"\|"music"\|"tools"\|"system"}`: show that screen on the Pi for a minute |
+| WS | `/device/ws` | the device link (below); `Authorization: Bearer <device token>` |
 
 ### `DELETE /sessions/{session_id}`
 Forget a conversation. `{"session_id": "...", "deleted": true}`
@@ -81,17 +94,24 @@ authenticated endpoints. See HOW-TO-RUN.md.
 | 503 | `llm_unavailable` / `llm_model_not_found` | Ollama down / model not pulled |
 | 504 | `llm_timeout` | No response within `AIRA_LLM_REQUEST_TIMEOUT_S` |
 
-## Device protocol (Phase 6 transport, defined now)
+## Device protocol (served at `/api/v1/device/ws`)
 
 `shared/protocol/messages.py` defines the versioned envelope used on the WebSocket link:
 
 ```json
-{"v": "1.0", "type": "DISPLAY_STATE_CHANGED", "id": "…", "ts": "2026-10-30T12:00:00Z",
+{"v": "1.1", "type": "DISPLAY_STATE_CHANGED", "id": "…", "ts": "2026-10-30T12:00:00Z",
  "device_id": "pi-zero-01", "session_id": null, "reply_to": null,
  "payload": {"expression": "happy", "intensity": 1.0}}
 ```
 
 Types: DEVICE_HELLO, SERVER_WELCOME, DEVICE_HEARTBEAT, WAKE_WORD_DETECTED, LISTENING_STARTED,
 LISTENING_STOPPED, AUDIO_CHUNK, TRANSCRIPTION_READY, THINKING_STARTED, SPEECH_STARTED,
-SPEECH_FINISHED, BARGE_IN, DISPLAY_STATE_CHANGED, SYSTEM_STATUS, BUTTON_EVENT, TOUCH_EVENT, ERROR.
+SPEECH_FINISHED, BARGE_IN, DISPLAY_STATE_CHANGED, SYSTEM_STATUS, BUTTON_EVENT, TOUCH_EVENT,
+USER_TEXT, CAPTION, SAY, REMINDER, CONFIRM_REQUEST, ERROR; 1.2 adds SHOW_SCREEN.
 Unknown types and unknown envelope fields are rejected.
+
+Link: the Pi connects, sends `DEVICE_HELLO {name, version, caps}`, receives `SERVER_WELCOME`,
+then follows `DISPLAY_STATE_CHANGED` / `CAPTION` / `REMINDER` / `CONFIRM_REQUEST`. It sends
+`BUTTON_EVENT` (wakes the web page's microphone), `USER_TEXT` (runs the agent; a Pi with
+audio then receives one `SAY` per sentence) and `DEVICE_HEARTBEAT`.
+Discovery: UDP broadcast on port 8766, `{"service":"aira","port":8765,"tls":true,"fp":"<sha256 of the cert>"}`.

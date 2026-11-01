@@ -1,0 +1,22 @@
+{
+  "apps": {
+    "obs": {
+      "name": "OBS Studio",
+      "aliases": ["obs", "recorder"],
+      "kind": "path",
+      "target": "%ProgramFiles%\\obs-studio\\bin\\64bit\\obs64.exe",
+      "process": "obs64.exe"
+    },
+    "arduino": {
+      "name": "Arduino IDE",
+      "aliases": ["arduino"],
+      "kind": "path",
+      "target": "%LOCALAPPDATA%\\Programs\\Arduino IDE\\Arduino IDE.exe",
+      "process": "Arduino IDE.exe"
+    }
+  },
+  "sites": {
+    "sodak": "https://sodakedutech.in",
+    "ollama": "https://ollama.com/library"
+  }
+}

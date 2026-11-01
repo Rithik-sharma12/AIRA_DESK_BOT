@@ -67,7 +67,8 @@ def make_settings(**overrides) -> Settings:
     import tempfile
 
     base = dict(api_key=SecretStr(TEST_KEY), log_dir=None, llm_warmup_on_start=True, _env_file=None,
-                data_dir=Path(tempfile.mkdtemp(prefix="aira-test-")), stt_provider="none", tts_provider="none")
+                data_dir=Path(tempfile.mkdtemp(prefix="aira-test-")), stt_provider="none", tts_provider="none",
+                agent_dry_run=True, agent_apps_file=None, device_discovery=False)
     base.update(overrides)
     return Settings(**base)
 

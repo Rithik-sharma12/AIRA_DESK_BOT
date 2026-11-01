@@ -1,4 +1,6 @@
 pytest>=8.0
-websockets>=12   # test client for the Wi-Fi keyboard server
+websockets>=12   # test client for the Wi-Fi keyboard server, and the Raspberry Pi link tests
+pillow>=10.1     # Raspberry Pi face tests (on the Pi itself these come from Debian packages)
+numpy>=1.26
 # Optional, for the real-browser web UI test (tests/integration/test_web_ui_browser.py):
 #   pip install playwright && python -m playwright install chromium

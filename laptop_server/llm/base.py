@@ -11,7 +11,9 @@ from collections.abc import AsyncIterator
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-Message = dict[str, str]  # {"role": "system"|"user"|"assistant", "content": "..."}
+# {"role": "system"|"user"|"assistant"|"tool", "content": "...", optional "tool_calls"/"tool_name"}
+Message = dict[str, Any]
+ToolSpec = dict[str, Any]   # Ollama/OpenAI function-tool schema: {"type": "function", "function": {...}}
 
 
 class LLMError(Exception):
@@ -74,10 +76,17 @@ class GenerationStats:
 
 
 @dataclass
+class ToolCall:
+    name: str
+    arguments: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class StreamChunk:
     text: str
     done: bool = False
     stats: GenerationStats | None = None
+    tool_calls: list[ToolCall] = field(default_factory=list)
 
 
 @dataclass
@@ -132,9 +141,15 @@ class LLMProvider(ABC):
     name: str = "abstract"
     model: str
 
+    supports_tools: bool = False
+
     @abstractmethod
-    def stream_chat(self, messages: list[Message]) -> AsyncIterator[StreamChunk]:
-        """Yield text chunks; the last chunk has ``done=True`` and carries stats."""
+    def stream_chat(self, messages: list[Message], tools: list[ToolSpec] | None = None) -> AsyncIterator[StreamChunk]:
+        """Yield text chunks; the last chunk has ``done=True`` and carries stats.
+
+        With ``tools``, the model may answer with tool calls instead of (or before) text;
+        they arrive in ``StreamChunk.tool_calls``.
+        """
 
     async def chat(self, messages: list[Message]) -> ChatResult:
         parts: list[str] = []

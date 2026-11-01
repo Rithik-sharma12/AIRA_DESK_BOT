@@ -58,6 +58,12 @@ def stack(tmp_path_factory):
         "AIRA_OLLAMA_BASE_URL": f"http://127.0.0.1:{ollama_port}",
         "AIRA_LLM_MODEL": "gemma4:e4b-it-qat",
         "AIRA_LOG_DIR": str(logs),
+        # Independent of the developer's .env (e.g. LAN + HTTPS for the Pi): plain HTTP on localhost.
+        "AIRA_HOST": "127.0.0.1",
+        "AIRA_ALLOW_LAN": "false",
+        "AIRA_SSL_CERTFILE": "",
+        "AIRA_SSL_KEYFILE": "",
+        "AIRA_DEVICE_DISCOVERY": "false",
     }
     server = subprocess.Popen(
         [sys.executable, "-m", "laptop_server"], cwd=ROOT, env=env,

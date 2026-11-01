@@ -184,6 +184,9 @@ Rules that are not optional:
 
 ## 6. Bring-up and tests (one module at a time)
 
+**Shortcut:** `raspberry_pi/setup_audio.sh` does the steps below for you (check only by default;
+`--dac`, `--duplex`, `--test`, `--undo`), with a backup before every change.
+
 Each block says where it runs. **Back up `config.txt` before any change** and add only one
 overlay per test:
 
@@ -255,6 +258,12 @@ pinctrl get 16-21,26        # expect input/none on all of them while the TFT is 
 sudo apt install -y python3-gpiozero
 python3 raspberry_pi/check_hardware.py --pin 26
 ```
+
+### 6.4b Wireless joystick (ESP32 + KY-023)
+
+Not wired to the Pi: an ESP32 WROOM reads a KY-023 joystick (VCC 3.3V, GND, VRX GPIO32,
+VRY GPIO33, SW GPIO27) and sends navigation events to the Pi over the same 2.4 GHz hotspot.
+Firmware, wiring and the three test stages: [esp32_joystick/README.md](../esp32_joystick/README.md).
 
 ### 6.5 Everything
 

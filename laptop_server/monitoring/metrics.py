@@ -24,6 +24,8 @@ class MetricsRecorder:
         self.errors: dict[str, int] = {}
 
     def record(self, stats: GenerationStats) -> None:
+        if stats.completion_tokens <= 0 and stats.model.startswith("aira-"):
+            return  # instant commands and confirmations: no model generation to measure
         self._items.append(stats)
 
     def record_error(self, code: str) -> None:

@@ -54,7 +54,8 @@ def main() -> int:
 
     setup_logging(settings.log_level, settings.log_dir)
     log = logging.getLogger("aira")
-    log.info("Starting AIRA (model %s)", settings.llm_model)
+    think = {False: "off", True: "on", None: "model default"}[settings.llm_think]
+    log.info("Starting AIRA (model %s, thinking %s)", settings.llm_model, think)
     if settings.web_ui_enabled:
         for url in web_urls(settings, tls):
             log.info("Web voice interface: %s", url)

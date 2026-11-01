@@ -25,9 +25,23 @@ from .base import (
     Message,
     ProviderHealth,
     StreamChunk,
+    ToolCall,
+    ToolSpec,
 )
 
 log = logging.getLogger("aira.llm.ollama")
+
+EMPTY_REPLY_FALLBACK = "Sorry, I got lost in thought there. Could you ask me that again?"
+
+
+class ThinkUnsupportedError(LLMError):
+    """The model does not accept Ollama's 'think' flag."""
+
+
+def is_loopback_url(url: str) -> bool:
+    """True when *url* points at this machine (so system proxies must be bypassed)."""
+    host = (httpx.URL(url).host or "").lower()
+    return host in {"localhost", "127.0.0.1", "::1"} or host.startswith("127.")
 
 NS = 1e9
 
@@ -41,6 +55,7 @@ def _model_matches(wanted: str, installed: str) -> bool:
 
 class OllamaProvider(LLMProvider):
     name = "ollama"
+    supports_tools = True
 
     def __init__(
         self,
@@ -62,12 +77,15 @@ class OllamaProvider(LLMProvider):
         self.temperature = temperature
         self.top_p = top_p
         self.max_tokens = max_tokens
-        self.keep_alive = keep_alive
+        # "-1" = keep the model loaded indefinitely; Ollama wants that as the number -1
+        self.keep_alive: str | int = -1 if str(keep_alive).strip() == "-1" else keep_alive
         self.think = think
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=httpx.Timeout(timeout_s, connect=5.0),
             transport=transport,
+            # A Windows/VPN system proxy must never intercept calls to the local Ollama.
+            trust_env=not is_loopback_url(self.base_url),
         )
 
     # ------------------------------------------------------------------ helpers
@@ -79,7 +97,8 @@ class OllamaProvider(LLMProvider):
             "num_predict": self.max_tokens,
         }
 
-    def build_chat_payload(self, messages: list[Message], *, stream: bool = True) -> dict[str, Any]:
+    def build_chat_payload(self, messages: list[Message], *, stream: bool = True,
+                           tools: list[ToolSpec] | None = None) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -87,9 +106,28 @@ class OllamaProvider(LLMProvider):
             "keep_alive": self.keep_alive,
             "options": self._options(),
         }
+        if tools:
+            payload["tools"] = tools
         if self.think is not None:
             payload["think"] = self.think
         return payload
+
+    @staticmethod
+    def parse_tool_calls(raw: Any) -> list[ToolCall]:
+        calls: list[ToolCall] = []
+        for item in raw or []:
+            fn = (item or {}).get("function") or {}
+            name = fn.get("name")
+            if not isinstance(name, str) or not name:
+                continue
+            args = fn.get("arguments") or {}
+            if isinstance(args, str):  # some models return the arguments as a JSON string
+                try:
+                    args = json.loads(args) if args.strip() else {}
+                except ValueError:
+                    args = {}
+            calls.append(ToolCall(name=name, arguments=args if isinstance(args, dict) else {}))
+        return calls
 
     def _map_http_error(self, status: int, body: bytes) -> LLMError:
         try:
@@ -103,7 +141,7 @@ class OllamaProvider(LLMProvider):
                 hint=f"Run:  ollama pull {self.model}   (or set AIRA_LLM_MODEL to an installed model)",
             )
         if "think" in lowered:
-            return LLMError(
+            return ThinkUnsupportedError(
                 f"Ollama rejected the 'think' option for {self.model}: {message}",
                 hint="Unset AIRA_LLM_THINK for this model.",
             )
@@ -125,10 +163,26 @@ class OllamaProvider(LLMProvider):
         )
 
     # ---------------------------------------------------------------- interface
-    async def stream_chat(self, messages: list[Message]) -> AsyncIterator[StreamChunk]:
-        payload = self.build_chat_payload(messages, stream=True)
+    async def stream_chat(self, messages: list[Message],
+                          tools: list[ToolSpec] | None = None) -> AsyncIterator[StreamChunk]:
+        try:
+            async for chunk in self._stream_chat_once(messages, tools):
+                yield chunk
+        except ThinkUnsupportedError:
+            # Older/non-reasoning models (llama3.1, qwen2.5...) reject the flag. Nothing has been
+            # yielded yet, so drop the flag for this model and retry transparently.
+            log.warning("%s does not accept Ollama's 'think' flag; retrying without it.", self.model)
+            self.think = None
+            async for chunk in self._stream_chat_once(messages, tools):
+                yield chunk
+
+    async def _stream_chat_once(self, messages: list[Message],
+                                tools: list[ToolSpec] | None = None) -> AsyncIterator[StreamChunk]:
+        payload = self.build_chat_payload(messages, stream=True, tools=tools)
         t0 = time.perf_counter()
         ttft: float | None = None
+        produced = False
+        thinking_chars = 0
         try:
             async with self._client.stream("POST", "/api/chat", json=payload) as resp:
                 if resp.status_code != 200:
@@ -143,13 +197,31 @@ class OllamaProvider(LLMProvider):
                         continue
                     if "error" in data:
                         raise LLMError(f"Ollama error: {data['error']}")
-                    text = (data.get("message") or {}).get("content") or ""
-                    # data["message"]["thinking"] (reasoning trace) is deliberately not spoken.
+                    msg = data.get("message") or {}
+                    text = msg.get("content") or ""
+                    # msg["thinking"] (reasoning trace) is deliberately not spoken, only measured.
+                    thinking_chars += len(msg.get("thinking") or "")
                     if text and ttft is None:
                         ttft = time.perf_counter() - t0
+                    calls = self.parse_tool_calls(msg.get("tool_calls"))
+                    produced = produced or bool(text.strip()) or bool(calls)
+                    if calls and not data.get("done"):
+                        yield StreamChunk(text=text, tool_calls=calls)
+                        continue
                     if data.get("done"):
                         stats = self.parse_stats(self.model, data, ttft, time.perf_counter() - t0)
-                        yield StreamChunk(text=text, done=True, stats=stats)
+                        if not produced:
+                            # Typical cause: a reasoning model spent the whole num_predict budget
+                            # thinking. Say something rather than going silent.
+                            log.warning(
+                                "%s finished with no visible reply (done_reason=%s, thinking_chars=%d). "
+                                "Set AIRA_LLM_THINK=false or raise AIRA_LLM_MAX_TOKENS.",
+                                self.model, stats.done_reason, thinking_chars,
+                            )
+                            text = EMPTY_REPLY_FALLBACK
+                        elif thinking_chars:
+                            log.info("%s spent %d characters thinking before replying.", self.model, thinking_chars)
+                        yield StreamChunk(text=text, done=True, stats=stats, tool_calls=calls)
                         return
                     if text:
                         yield StreamChunk(text=text)

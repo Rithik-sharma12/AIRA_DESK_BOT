@@ -20,10 +20,24 @@ ends. If asked to do any of these, say cheerfully that this skill is still being
 and offer what you can do instead. Never pretend to have done it and never make up \
 numbers, readings, files or results."""
 
+TOOL_CAPABILITIES = """\
+You can act on the laptop with your tools: open and close apps, open websites and web \
+searches, read live CPU, memory, GPU, battery, disk and internet status, control music \
+and volume, change screen brightness, set timers and reminders, lock the screen, and \
+sleep, shut down or restart the laptop.
+When the user asks for one of these, call the matching tool right away instead of \
+describing how to do it. Never say you did something unless the tool result says so, \
+and never make up numbers: read them with system_status. Answer status questions in one \
+short spoken sentence using the tool's numbers.
+What you cannot do yet: read or edit files, send messages or emails, see the screen, or \
+remember things after this conversation ends. If asked, say cheerfully that this skill \
+is still being built and offer what you can do instead. Never reveal secrets."""
+
 SCRIPT_RULES = {
     "tamil": (
         "When you speak Tamil, write Tamil words in Tamil script (தமிழ்) and keep English words "
-        "in English letters, so the voice engine can pronounce both correctly. "
+        "in English letters, so the voice engine can pronounce both correctly. Never write an English "
+        "word in Tamil script (write timer, not டைமர்). "
         "Example: \"சரி, உங்க Python error-ஐ பார்க்கலாம்!\""
     ),
     "latin": (
@@ -62,6 +76,7 @@ def build_system_prompt(
     tamil_output_script: str = "tamil",
     persona_file: Path | None = None,
     now: datetime | None = None,
+    tools_enabled: bool = False,
 ) -> str:
     now = now or datetime.now()
     if persona_file is not None:
@@ -73,7 +88,7 @@ def build_system_prompt(
         prompt = template.format(
             user_ref=user_ref,
             script_rule=SCRIPT_RULES.get(tamil_output_script, SCRIPT_RULES["tamil"]),
-            capabilities=PHASE_CAPABILITIES,
+            capabilities=TOOL_CAPABILITIES if tools_enabled else PHASE_CAPABILITIES,
             today=now.strftime("%A, %d %B %Y"),
             now=now.strftime("%I:%M %p"),
         )

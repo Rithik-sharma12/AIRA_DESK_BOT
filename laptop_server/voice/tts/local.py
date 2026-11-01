@@ -29,7 +29,9 @@ class PiperTTS(TTSProvider):
     name = "piper"
     offline = True
 
-    def __init__(self, *, model_path: str | Path, use_cuda: bool = False):
+    def __init__(self, *, model_path: str | Path, use_cuda: bool = False,
+                 noise_scale: float | None = None, noise_w: float | None = None):
+        self.noise_scale, self.noise_w = noise_scale, noise_w     # None = the voice's own setting
         try:
             from piper import PiperVoice
         except ImportError as exc:
@@ -47,7 +49,8 @@ class PiperTTS(TTSProvider):
                 try:
                     from piper import SynthesisConfig
 
-                    self._voice.synthesize_wav(text, wav, syn_config=SynthesisConfig(length_scale=length_scale))
+                    self._voice.synthesize_wav(text, wav, syn_config=SynthesisConfig(
+                        length_scale=length_scale, noise_scale=self.noise_scale, noise_w_scale=self.noise_w))
                 except ImportError:
                     self._voice.synthesize_wav(text, wav)
             else:  # older piper-tts API

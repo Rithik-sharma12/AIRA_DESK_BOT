@@ -7,10 +7,13 @@ Measures, per model and context length:
 
 Writes benchmarks/<timestamp>.json and a Markdown report next to it.
 
+Thinking is OFF by default, matching the AIRA server. Models that are not installed are
+skipped with the `ollama pull` command to get them.
+
 Examples (PowerShell, from the repo root, with the venv active):
-  python scripts/benchmark_llm.py
-  python scripts/benchmark_llm.py --models gemma4:e4b-it-qat gemma4:12b-it-qat --ctx 4096 8192 --runs 3
-  python scripts/benchmark_llm.py --think off
+  python scripts/benchmark_llm.py                                   # the recommended shortlist
+  python scripts/benchmark_llm.py --models gemma4:e4b-it-qat qwen3.5:9b --runs 2
+  python scripts/benchmark_llm.py --models gemma4:12b --think default  # see what thinking costs
 """
 
 from __future__ import annotations
@@ -46,7 +49,11 @@ PROMPTS = {
     "tamil": "வணக்கம் AIRA! இன்னைக்கு நான் Java படிக்கணும். ஒரு சின்ன study plan சொல்லு.",
     "tanglish": "Enna AIRA, Python la list comprehension na enna nu simple ah sollu.",
     "reasoning": "If I study Java for 45 minutes a day, how many hours is that in two weeks? Explain briefly.",
+    "honesty": "What is my laptop's CPU temperature right now?",
 }
+
+# Shortlist for an 8 GB RTX 4060 laptop (see HOW-TO-RUN.md, "Choosing a model").
+DEFAULT_MODELS = ["gemma4:e4b-it-qat", "qwen3.5:9b", "qwen3.5:4b", "gemma4:12b"]
 
 
 # ----------------------------------------------------------------------------- sampling
@@ -123,17 +130,24 @@ def stream_once(client: httpx.Client, model: str, system: str, prompt: str, num_
     t0 = time.perf_counter()
     ttft = None
     text = []
+    thinking_chars = 0
     final: dict = {}
     with client.stream("POST", "/api/chat", json=payload, timeout=600) as r:
         if r.status_code != 200:
-            raise RuntimeError(f"HTTP {r.status_code}: {r.read().decode()[:300]}")
+            body = r.read().decode(errors="replace")[:300]
+            if think is not None and "think" in body.lower():
+                print(f"  ({model} does not accept the think flag; running without it)")
+                return stream_once(client, model, system, prompt, num_ctx, max_tokens, None)
+            raise RuntimeError(f"HTTP {r.status_code}: {body}")
         for line in r.iter_lines():
             if not line.strip():
                 continue
             d = json.loads(line)
             if "error" in d:
                 raise RuntimeError(d["error"])
-            piece = (d.get("message") or {}).get("content") or ""
+            msg = d.get("message") or {}
+            piece = msg.get("content") or ""
+            thinking_chars += len(msg.get("thinking") or "")
             if piece and ttft is None:
                 ttft = time.perf_counter() - t0
             text.append(piece)
@@ -153,6 +167,7 @@ def stream_once(client: httpx.Client, model: str, system: str, prompt: str, num_
         "completion_tokens": final.get("eval_count", 0),
         "tok_s": final.get("eval_count", 0) / eval_s if eval_s else 0.0,
         "done_reason": final.get("done_reason"),
+        "thinking_chars": thinking_chars,
         "reply": "".join(text).strip(),
     }
 
@@ -183,8 +198,9 @@ def bench_config(client, model, num_ctx, runs, max_tokens, think, system) -> dic
             for i in range(runs):
                 r = stream_once(client, model, system, prompt, num_ctx, max_tokens, think)
                 warm[name].append(r)
+                flag = "  << EMPTY REPLY" if not r["reply"] else ""
                 print(f"  {name:<9} run {i + 1}: ttft={r['ttft_s'] or 0:.2f}s tok/s={r['tok_s']:.1f} "
-                      f"({r['completion_tokens']} tok)")
+                      f"({r['completion_tokens']} tok, {r['thinking_chars']} thinking chars){flag}")
     finally:
         sampler.stop()
 
@@ -207,6 +223,8 @@ def bench_config(client, model, num_ctx, runs, max_tokens, think, system) -> dic
         "gpu_mem_baseline_mb": baseline["mem_used_mb"] if baseline else None,
         "gpu_util_mean_pct": round(statistics.fmean(sampler.gpu_util), 1) if sampler.gpu_util else None,
         "ram_peak_gb": round(max(sampler.ram_used_gb), 2) if sampler.ram_used_gb else None,
+        "empty_replies": sum(1 for r in all_warm if not r["reply"]),
+        "warm_runs": len(all_warm),
     }
     summary["verdict"] = verdict(summary)
     return {"summary": summary, "cold": cold, "warm": warm}
@@ -220,6 +238,8 @@ def verdict(s: dict) -> str:
         problems.append(f"tok/s min < {TARGET_TOKENS_PER_S}")
     if s["gpu_fraction"] < TARGET_GPU_FRACTION:
         problems.append(f"only {s['gpu_fraction'] * 100:.0f}% on GPU")
+    if s.get("empty_replies"):
+        problems.append(f"{s['empty_replies']}/{s['warm_runs']} empty replies")
     return "PASS" if not problems else "FAIL: " + "; ".join(problems)
 
 
@@ -235,22 +255,22 @@ def write_report(results: list[dict], meta: dict, out_dir: Path) -> Path:
         f"- Runs per prompt: {meta['runs']}  |  max tokens: {meta['max_tokens']}  |  think: {meta['think']}",
         f"- Targets: warm TTFT p50 ≤ {TARGET_TTFT_S}s, min ≥ {TARGET_TOKENS_PER_S} tok/s, 100% of model in VRAM",
         "",
-        "| Model | ctx | cold load s | warm TTFT p50 s | tok/s mean (min) | size GB | % in VRAM | GPU peak MB | RAM peak GB | Verdict |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| Model | ctx | cold load s | warm TTFT p50 s | tok/s mean (min) | size GB | % in VRAM | GPU peak MB | RAM peak GB | empty | Verdict |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in results:
         s = r["summary"]
         lines.append(
             f"| {s['model']} | {s['num_ctx']} | {s['cold_load_s']} | {s['warm_ttft_p50_s']} | "
             f"{s['tok_s_mean']} ({s['tok_s_min']}) | {s['model_size_gb']} | {s['gpu_fraction'] * 100:.0f}% | "
-            f"{s['gpu_mem_peak_mb']} | {s['ram_peak_gb']} | {s['verdict']} |"
+            f"{s['gpu_mem_peak_mb']} | {s['ram_peak_gb']} | {s.get('empty_replies', 0)} | {s['verdict']} |"
         )
-    lines += ["", "## Sample replies (warm run 1)", ""]
+    lines += ["", "## Sample replies (warm run 1) — judge Tamil/Tanglish quality and honesty here", ""]
     for r in results:
         s = r["summary"]
         lines.append(f"### {s['model']} @ {s['num_ctx']}")
         for name, runs in r["warm"].items():
-            lines.append(f"- **{name}**: {runs[0]['reply'][:300]}")
+            lines.append(f"- **{name}**: {runs[0]['reply'][:300] or '(empty reply)'}")
         lines.append("")
     md = out_dir / f"llm-{stamp}.md"
     md.write_text("\n".join(lines), encoding="utf-8")
@@ -260,27 +280,34 @@ def write_report(results: list[dict], meta: dict, out_dir: Path) -> Path:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--ollama", default="http://127.0.0.1:11434")
-    ap.add_argument("--models", nargs="+", default=["gemma4:e4b-it-qat", "gemma4:12b-it-qat"])
+    ap.add_argument("--models", nargs="+", default=DEFAULT_MODELS)
     ap.add_argument("--ctx", nargs="+", type=int, default=[4096])
     ap.add_argument("--runs", type=int, default=3)
     ap.add_argument("--max-tokens", type=int, default=200)
-    ap.add_argument("--think", choices=["default", "on", "off"], default="default")
+    ap.add_argument("--think", choices=["default", "on", "off"], default="off")
     ap.add_argument("--out", type=Path, default=ROOT / "benchmarks")
     a = ap.parse_args()
     think = {"default": None, "on": True, "off": False}[a.think]
 
-    client = httpx.Client(base_url=a.ollama, timeout=30)
+    client = httpx.Client(base_url=a.ollama, timeout=30, trust_env=False)
     try:
         version = client.get("/api/version").json().get("version")
         installed = {m["name"] for m in client.get("/api/tags").json().get("models", [])}
     except httpx.HTTPError as exc:
-        print(f"Cannot reach Ollama at {a.ollama}: {exc}")
+        print(f"Cannot reach Ollama at {a.ollama} ({exc.__class__.__name__}).")
+        print("Ollama is not running: start it from the Start menu (or run 'ollama serve' in another window),")
+        print("or start AIRA with .\\scripts\\run_server.ps1, which starts Ollama for you.")
         return 2
-    missing = [m for m in a.models if m not in installed]
+    def is_installed(m: str) -> bool:
+        return m in installed or f"{m}:latest" in installed
+
+    missing = [m for m in a.models if not is_installed(m)]
     if missing:
-        print("Not installed: " + ", ".join(missing))
-        print("Installed: " + ", ".join(sorted(installed)))
-        print("Pull with:  " + "  ;  ".join(f"ollama pull {m}" for m in missing))
+        print("Skipping (not installed): " + ", ".join(missing))
+        print("  get them with:  " + "  ;  ".join(f"ollama pull {m}" for m in missing))
+    a.models = [m for m in a.models if is_installed(m)]
+    if not a.models:
+        print("None of the requested models are installed. Installed: " + ", ".join(sorted(installed)))
         return 2
 
     gpu = query_gpu()

@@ -27,6 +27,19 @@ def report(status: str, name: str, detail: str = "") -> None:
     print(f"[{status:<4}] {name}" + (f" — {detail}" if detail else ""))
 
 
+def windows_user_env(name: str) -> str | None:
+    """Read a user-level env var saved in the registry (new terminals see it; this one may not)."""
+    if os.name != "nt":
+        return None
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+            return str(winreg.QueryValueEx(key, name)[0])
+    except OSError:
+        return None
+
+
 def main() -> int:
     v = sys.version_info
     if v >= (3, 11):
@@ -36,13 +49,30 @@ def main() -> int:
     else:
         report("FAIL", "Python", "3.10+ required")
 
+    in_venv = sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+    venv_python = ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    missing = []
     for mod in ("fastapi", "uvicorn", "httpx", "pydantic", "pydantic_settings", "psutil"):
         try:
             importlib.import_module(mod)
         except ImportError:
-            report("FAIL", f"package {mod}", "run: pip install -r requirements.txt")
-    if not any(r[1].startswith("package") for r in results):
-        report("PASS", "Python packages")
+            missing.append(mod)
+    if missing:
+        report("FAIL", "Python packages", "missing: " + ", ".join(missing))
+        if not in_venv and venv_python.exists():
+            print()
+            print(f"  You are running the system Python ({sys.executable}),")
+            print("  not the project's virtual environment. Use one of these instead:")
+            if os.name == "nt":
+                print("    PowerShell : .\\.venv\\Scripts\\Activate.ps1   (then re-run this script)")
+                print("    cmd        : .venv\\Scripts\\activate.bat     (then re-run this script)")
+                print("    either     : .venv\\Scripts\\python.exe scripts\\check_environment.py")
+            else:
+                print("    source .venv/bin/activate   (then re-run this script)")
+        else:
+            print("  Fix: pip install -r requirements.txt")
+        return 1
+    report("PASS", "Python packages", "virtual environment" if in_venv else "system Python")
 
     from pydantic import ValidationError
 
@@ -60,18 +90,26 @@ def main() -> int:
 
     import httpx
 
+    from laptop_server.llm.ollama_provider import is_loopback_url
+
+    client = httpx.Client(timeout=5, trust_env=not is_loopback_url(s.ollama_base_url))
     try:
-        ver = httpx.get(f"{s.ollama_base_url}/api/version", timeout=3).json().get("version")
+        ver = client.get(f"{s.ollama_base_url}/api/version", timeout=3).json().get("version")
         report("PASS", "Ollama reachable", f"{s.ollama_base_url} (version {ver})")
-        names = sorted(m["name"] for m in httpx.get(f"{s.ollama_base_url}/api/tags", timeout=5).json()["models"])
+        names = sorted(m["name"] for m in client.get(f"{s.ollama_base_url}/api/tags").json()["models"])
         if s.llm_model in names or f"{s.llm_model}:latest" in names:
             report("PASS", "Model installed", s.llm_model)
         else:
             gemma = [n for n in names if n.startswith("gemma")]
             report("FAIL", "Model installed",
-                   f"{s.llm_model} missing. Run: ollama pull {s.llm_model}. Installed gemma: {gemma or 'none'}")
-    except httpx.HTTPError:
-        report("FAIL", "Ollama reachable", f"nothing at {s.ollama_base_url}. Install from ollama.com and start it.")
+                   f"{s.llm_model} missing. Run: ollama pull {s.llm_model}  "
+                   f"(or set AIRA_LLM_MODEL in .env to one you have; installed gemma: {gemma or 'none'})")
+    except httpx.HTTPError as exc:
+        report("FAIL", "Ollama reachable",
+               f"no answer at {s.ollama_base_url} ({exc.__class__.__name__}). Start the Ollama app "
+               "(Start menu) or run 'ollama serve' in another window, then re-run this check.")
+    finally:
+        client.close()
 
     sys.path.insert(0, str(ROOT / "scripts"))
     from benchmark_llm import query_gpu
@@ -94,9 +132,11 @@ def main() -> int:
 
     recs = {"OLLAMA_FLASH_ATTENTION": "1", "OLLAMA_KV_CACHE_TYPE": "q8_0"}
     for k, want in recs.items():
-        have = os.environ.get(k)
+        have = os.environ.get(k) or windows_user_env(k)
         if have != want:
             report("WARN", k, f"is {have!r}; {want!r} reduces VRAM use (set as a Windows user env var, restart Ollama)")
+        elif os.environ.get(k) != want:
+            report("PASS", k, f"{want} saved for your user — quit and restart Ollama once so it applies")
 
     with socket.socket() as sock:
         try:

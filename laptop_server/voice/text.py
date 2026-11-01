@@ -131,3 +131,36 @@ def split_by_script(text: str, default: Lang = "ta") -> list[ScriptRun]:
 def dominant_language(text: str) -> Lang:
     """'en' only if the text has no Tamil script at all."""
     return "ta" if has_tamil(text) else "en"
+
+
+# ---------------------------------------------------------------------- speech cleanup
+_MD_LINK = re.compile(r"\[([^\]]+)\]\((?:https?://)?[^)]+\)")
+_URL = re.compile(r"https?://\S+|www\.\S+")
+_MD_MARKS = re.compile(r"(\*\*|__|\*|`+|~~|^#{1,6}\s*|^>\s*|^\s*[-•]\s+)", re.M)
+_SPOKEN = [
+    (re.compile(r"\s*°\s*C\b"), " degrees Celsius"), (re.compile(r"\s*°\s*F\b"), " degrees Fahrenheit"),
+    (re.compile(r"°"), " degrees"), (re.compile(r"\s*&\s*"), " and "), (re.compile(r"\s*(->|→)\s*"), ", "),
+    (re.compile(r"\be\.g\.", re.I), "for example"), (re.compile(r"\bi\.e\.", re.I), "that is"),
+    (re.compile(r"\betc\.", re.I), "etcetera"), (re.compile(r"\bAIRA\b"), "Aira"),
+    (re.compile(r"\s*\+\s*(?=\d)"), " plus "), (re.compile(r"(?<=\d)\s*x\s*(?=\d)"), " by "),
+]
+
+
+def _is_symbol(ch: str) -> bool:
+    import unicodedata
+
+    cat = unicodedata.category(ch)
+    return cat in ("So", "Sk", "Cs", "Co") or 0xFE00 <= ord(ch) <= 0xFE0F or ord(ch) in (0x200D, 0x20E3)
+
+
+def speakable(text: str) -> str:
+    """What the voice should say: no markdown, links, emoji; symbols as words ("24°C" -> "24 degrees Celsius").
+    Tamil and English letters, digits and normal punctuation pass through unchanged."""
+    text = _MD_LINK.sub(r"\1", text)
+    text = _URL.sub("a link", text)
+    text = _MD_MARKS.sub("", text)
+    for pattern, words in _SPOKEN:
+        text = pattern.sub(words, text)
+    text = "".join(" " if _is_symbol(ch) else ch for ch in text)
+    text = re.sub(r"(?<=[^\s.!?,:;।])[ \t]*\n+", ". ", text)      # list lines / line breaks become a pause
+    return re.sub(r"\s+", " ", text).strip()

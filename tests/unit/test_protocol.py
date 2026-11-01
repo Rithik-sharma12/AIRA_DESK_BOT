@@ -10,7 +10,7 @@ def test_round_trip():
     back = Envelope.from_json(e.to_json())
     assert back.type is MessageType.DISPLAY_STATE_CHANGED
     assert DisplayStatePayload(**back.payload).expression is Expression.HAPPY
-    assert back.v == "1.0"
+    assert back.v == "1.2"
 
 
 def test_spec_message_types_present():

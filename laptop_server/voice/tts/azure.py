@@ -25,8 +25,11 @@ def _pct(value: float) -> str:
     return f"{'+' if value >= 0 else ''}{value:.0f}%"
 
 
-def _voice_block(voice_name: str, text: str, s: VoiceSettings, style: str | None) -> str:
-    inner = f'<prosody rate={quoteattr(_pct((s.rate - 1.0) * 100))} pitch={quoteattr(_pct(s.pitch_pct))}>{escape(text)}</prosody>'
+def _voice_block(voice_name: str, text: str, s: VoiceSettings, style: str | None, lang: str = "ta") -> str:
+    # Per-language pitch (VoiceSettings.extra "ta_pitch_pct"/"en_pitch_pct") lets a naturally
+    # young voice (e.g. en-US-AnaNeural) stay as it is while an adult one is raised.
+    pitch = s.extra.get(f"{lang}_pitch_pct", s.pitch_pct)
+    inner = f'<prosody rate={quoteattr(_pct((s.rate - 1.0) * 100))} pitch={quoteattr(_pct(pitch))}>{escape(text)}</prosody>'
     if style:
         inner = f"<mstts:express-as style={quoteattr(style)}>{inner}</mstts:express-as>"
     return f"<voice name={quoteattr(voice_name)}>{inner}</voice>"
@@ -44,13 +47,13 @@ def build_ssml(text: str, s: VoiceSettings, *, ta_voice: str, en_voice: str,
         runs = split_by_script(text)
         blocks = "".join(
             _voice_block(ta_voice if r.lang == "ta" else en_voice, r.text, s,
-                         ta_style if r.lang == "ta" else en_style)
+                         ta_style if r.lang == "ta" else en_style, r.lang)
             for r in runs
         )
     elif s.strategy == "auto" and dominant_language(text) == "en":
-        blocks = _voice_block(en_voice, text, s, en_style)
+        blocks = _voice_block(en_voice, text, s, en_style, "en")
     else:  # ta_only, or auto with Tamil present
-        blocks = _voice_block(ta_voice, text, s, ta_style)
+        blocks = _voice_block(ta_voice, text, s, ta_style, "ta")
     lang = LOCALE[dominant_language(text)]
     return (
         '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" '

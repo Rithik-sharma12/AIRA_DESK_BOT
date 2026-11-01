@@ -4,8 +4,12 @@ Every message on the WebSocket link is one JSON object: an :class:`Envelope`.
 The envelope is versioned so that additional physical devices (a second Pi,
 an ESP32 status light, a phone) can join later without breaking existing ones.
 
-Phase 1 only *defines* this contract and tests it; the WebSocket transport that
-carries it is implemented in Phase 6.
+The laptop serves it at ``wss://<laptop>:8765/api/v1/device/ws`` (laptop_server/api/
+device_routes.py); the Raspberry Pi client is raspberry_pi/aira_pi/ (which keeps its own
+dependency-free copy of the names below, checked by tests/unit/test_device_link.py).
+
+1.1 (additive): USER_TEXT, CAPTION, SAY, REMINDER, CONFIRM_REQUEST; DisplayState.hold_s.
+1.2 (additive): SHOW_SCREEN; CAPTION.source.
 """
 
 from __future__ import annotations
@@ -17,7 +21,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-PROTOCOL_VERSION = "1.0"
+PROTOCOL_VERSION = "1.2"
 
 
 class MessageType(str, Enum):
@@ -44,6 +48,14 @@ class MessageType(str, Enum):
     SYSTEM_STATUS = "SYSTEM_STATUS"
     BUTTON_EVENT = "BUTTON_EVENT"
     TOUCH_EVENT = "TOUCH_EVENT"
+
+    # Conversation mirroring and device speech (1.1)
+    USER_TEXT = "USER_TEXT"                  # device -> server: something the user said/typed on the device
+    CAPTION = "CAPTION"                      # server -> device: {role: user|aira, text}
+    SAY = "SAY"                              # server -> device with audio: speak this sentence
+    REMINDER = "REMINDER"                    # server -> device: a timer or reminder went off
+    CONFIRM_REQUEST = "CONFIRM_REQUEST"      # server -> device: AIRA is waiting for yes/no
+    SHOW_SCREEN = "SHOW_SCREEN"              # server -> device (1.2): {screen: home|chat|music|tools|system}
 
     ERROR = "ERROR"
 
@@ -94,6 +106,8 @@ class DisplayStatePayload(BaseModel):
     expression: Expression
     intensity: float = Field(default=1.0, ge=0.0, le=1.0)
     caption: str | None = Field(default=None, max_length=120)
+    hold_s: float | None = Field(default=None, ge=0, le=60,
+                                 description="Return to idle after this long unless another state arrives")
 
 
 class ErrorPayload(BaseModel):

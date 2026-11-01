@@ -1,7 +1,7 @@
 """REST + Server-Sent-Events API (v1).
 
 POST /api/v1/chat          -> full reply as JSON
-POST /api/v1/chat/stream   -> reply streamed as SSE events: start, token, done | error
+POST /api/v1/chat/stream   -> reply streamed as SSE events: start, token, tool, confirm, done | error
 DELETE /api/v1/sessions/{id}
 GET  /api/v1/status, /api/v1/metrics   (authenticated)
 GET  /api/v1/health                    (unauthenticated, minimal)
@@ -47,7 +47,8 @@ def build_router(require_api_key) -> APIRouter:
     def _system_prompt(request: Request) -> str:
         s = request.app.state.settings
         return build_system_prompt(
-            user_name=s.user_name, tamil_output_script=s.tamil_output_script, persona_file=s.persona_file
+            user_name=s.user_name, tamil_output_script=s.tamil_output_script, persona_file=s.persona_file,
+            tools_enabled=request.app.state.agent.tools_enabled,
         )
 
     def _log_exchange(request: Request, session_id: str, user: str, reply: str, stats: dict) -> None:
@@ -94,17 +95,16 @@ def build_router(require_api_key) -> APIRouter:
         st = request.app.state
         text = _validate_message(request, body)
         session = st.conversations.get_or_create(body.session_id)
+        reply, stats = "", {}
         async with session.lock:
-            messages = st.conversations.build_messages(session, _system_prompt(request), text)
-            try:
-                result = await st.provider.chat(messages)
-            except LLMError as exc:
-                st.metrics.record_error(exc.code)
-                raise
-            reply = result.text.strip()
-            st.conversations.record_exchange(session, text, reply)
-        st.metrics.record(result.stats)
-        stats = result.stats.to_dict()
+            async for ev in st.agent.run(session, _system_prompt(request), text):
+                if ev.kind == "error":
+                    st.metrics.record_error(ev.data["code"])
+                    raise ev.exc or LLMError(ev.data["message"], hint=ev.data.get("hint"))
+                if ev.kind == "done":
+                    reply = ev.data["reply"]
+                    st.metrics.record(ev.data["stats"])
+                    stats = ev.data["stats"].to_dict()
         _log_exchange(request, session.id, text, reply, stats)
         return ChatResponse(session_id=session.id, reply=reply, stats=stats)
 
@@ -118,24 +118,18 @@ def build_router(require_api_key) -> APIRouter:
         async def events() -> AsyncIterator[str]:
             async with session.lock:
                 yield _sse("start", {"session_id": session.id})
-                messages = st.conversations.build_messages(session, system_prompt, text)
-                parts: list[str] = []
-                try:
-                    async for chunk in st.provider.stream_chat(messages):
-                        if chunk.text:
-                            parts.append(chunk.text)
-                            yield _sse("token", {"text": chunk.text})
-                        if chunk.done and chunk.stats:
-                            reply = "".join(parts).strip()
-                            st.conversations.record_exchange(session, text, reply)
-                            st.metrics.record(chunk.stats)
-                            stats = chunk.stats.to_dict()
-                            _log_exchange(request, session.id, text, reply, stats)
-                            yield _sse("done", {"session_id": session.id, "reply": reply, "stats": stats})
-                except LLMError as exc:
-                    st.metrics.record_error(exc.code)
-                    log.warning("stream failed: %s", exc)
-                    yield _sse("error", {"code": exc.code, "message": str(exc), "hint": exc.hint})
+                async for ev in st.agent.run(session, system_prompt, text):
+                    if ev.kind == "done":
+                        st.metrics.record(ev.data["stats"])
+                        stats = ev.data["stats"].to_dict()
+                        _log_exchange(request, session.id, text, ev.data["reply"], stats)
+                        yield _sse("done", {"session_id": session.id, "reply": ev.data["reply"], "stats": stats})
+                    elif ev.kind == "error":
+                        st.metrics.record_error(ev.data["code"])
+                        log.warning("stream failed: %s", ev.data["message"])
+                        yield _sse("error", ev.data)
+                    else:
+                        yield _sse(ev.kind, ev.data)
 
         return StreamingResponse(
             events(),

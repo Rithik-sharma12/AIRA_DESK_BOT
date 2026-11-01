@@ -1,0 +1,104 @@
+{
+ "size": [
+  300,
+  240
+ ],
+ "source": "concept board stills + generated blink/mouth frames (scripts/make_mascot_animation.py)",
+ "emotions": {
+  "idle": {
+   "fps": 1,
+   "frames": [
+    "frame_00.png"
+   ],
+   "blink": [
+    "blink_01.png",
+    "blink_02.png",
+    "blink_02.png",
+    "blink_01.png"
+   ]
+  },
+  "happy": {
+   "fps": 2,
+   "frames": [
+    "frame_00.png"
+   ]
+  },
+  "thinking": {
+   "fps": 2,
+   "frames": [
+    "frame_00.png"
+   ],
+   "blink": [
+    "blink_01.png",
+    "blink_02.png",
+    "blink_02.png",
+    "blink_01.png"
+   ]
+  },
+  "listening": {
+   "fps": 4,
+   "frames": [
+    "frame_00.png"
+   ]
+  },
+  "speaking": {
+   "fps": 7,
+   "frames": [
+    "frame_00.png",
+    "frame_01.png",
+    "frame_02.png",
+    "frame_01.png",
+    "frame_00.png",
+    "frame_02.png"
+   ],
+   "blink": [
+    "blink_01.png",
+    "blink_02.png",
+    "blink_02.png",
+    "blink_01.png"
+   ]
+  },
+  "excited": {
+   "fps": 4,
+   "frames": [
+    "frame_00.png"
+   ],
+   "blink": [
+    "blink_01.png",
+    "blink_02.png",
+    "blink_02.png",
+    "blink_01.png"
+   ]
+  },
+  "confused": {
+   "fps": 2,
+   "frames": [
+    "frame_00.png"
+   ],
+   "blink": [
+    "blink_01.png",
+    "blink_02.png",
+    "blink_02.png",
+    "blink_01.png"
+   ]
+  },
+  "sleepy": {
+   "fps": 1,
+   "frames": [
+    "frame_00.png"
+   ]
+  },
+  "error": {
+   "fps": 2,
+   "frames": [
+    "frame_00.png"
+   ],
+   "blink": [
+    "blink_01.png",
+    "blink_02.png",
+    "blink_02.png",
+    "blink_01.png"
+   ]
+  }
+ }
+}

@@ -1,0 +1,35 @@
+# AIRA face, captions and button.  Installed by raspberry_pi/install.sh (it fills in @USER@/@DIR@).
+[Unit]
+Description=AIRA on the Raspberry Pi (face on the 3.5" screen, link to the laptop)
+Documentation=file://@DIR@/README.md
+After=network-online.target aira-tft-console.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+WorkingDirectory=@DIR@
+Environment=PYTHONUNBUFFERED=1
+# Take the 3.5" screen from the text console while the face runs, and give it back after.
+ExecStartPre=-+/bin/sh -c 'command -v con2fbmap >/dev/null && con2fbmap 1 0; echo 0 > /sys/class/graphics/fbcon/cursor_blink'
+ExecStart=/usr/bin/python3 -m aira_pi run
+ExecStopPost=-+/bin/sh -c 'command -v con2fbmap >/dev/null && con2fbmap 1 1'
+# A clean exit (button held 6 s) leaves the text console up; crashes restart the face.
+Restart=on-failure
+RestartSec=3
+
+# Hardening: needs the framebuffer, GPIO, sound and the network; cannot change the system.
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryMax=180M
+
+[Install]
+WantedBy=multi-user.target

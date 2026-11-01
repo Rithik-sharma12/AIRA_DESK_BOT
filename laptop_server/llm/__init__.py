@@ -10,6 +10,8 @@ from .base import (  # noqa: F401
     Message,
     ProviderHealth,
     StreamChunk,
+    ToolCall,
+    ToolSpec,
 )
 from .factory import create_provider  # noqa: F401
 from .ollama_provider import OllamaProvider  # noqa: F401

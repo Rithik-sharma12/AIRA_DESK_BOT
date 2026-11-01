@@ -11,3 +11,8 @@ bakeoff_runs/
 bakeoff_recordings/
 data/
 certs/
+voices/
+voice_preview/
+
+# ESP32 joystick: Wi-Fi password and pairing token
+esp32_joystick/**/secrets.h
